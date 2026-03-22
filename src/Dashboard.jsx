@@ -77,7 +77,7 @@ const Dashboard = ({ user, languageMode }) => {
 
   const calculateStats = () => {
     // For dashboard counts and confirmation percentage, always use full dataset
-    const filteredData = allVoteData;
+    const filteredData = allVoteData || [];
 
     const constituencies = new Set();
     const wards = new Set();
@@ -98,20 +98,32 @@ const Dashboard = ({ user, languageMode }) => {
     };
 
     filteredData.forEach(voter => {
+      // Map to new schema field names from output.jsx
+      const constituency = voter["AC_NAME"];
+      const ward = voter["SECTION"]; // numeric/ward section
+      const booth = voter["BOOTH"];
+      const street = voter["SECTION_NAME"]; // street / nagar
+
       // Count unique locations
-      if (voter.Constituency) constituencies.add(voter.Constituency);
-      if (voter.Ward) wards.add(voter.Ward);
-      if (voter.Constituency) taluks.add(voter.Constituency); // Using constituency as taluk
-      if (voter.Part) booths.add(voter.Part);
-      if (voter.Division) streets.add(voter.Division);
+      if (constituency) constituencies.add(constituency);
+      if (ward !== undefined && ward !== null && ward !== "") wards.add(ward);
+      if (constituency) taluks.add(constituency); // Using constituency as taluk placeholder
+      if (booth) booths.add(booth);
+      if (street) streets.add(street);
 
-      // Count gender
-      if (voter.Gender === 'ஆண்') maleCount++;
-      else if (voter.Gender === 'பெண்') femaleCount++;
-      else transgenderCount++;
+      // Count gender from GENDER field (English/Tamil variations)
+      const genderRaw = String(voter["GENDER"] || "").trim().toLowerCase();
+      if (genderRaw === "female" || genderRaw === "f" || genderRaw.includes("பெண்")) {
+        femaleCount++;
+      } else if (genderRaw === "other" || genderRaw.includes("trans") || genderRaw.includes("திருநங்கை")) {
+        transgenderCount++;
+      } else if (genderRaw) {
+        // Treat all other non-empty values as male (e.g., "male", "m")
+        maleCount++;
+      }
 
-      // Count age groups
-      const age = parseInt(voter.Age);
+      // Count age groups from AGE field
+      const age = parseInt(voter["AGE"], 10);
       if (age >= 18 && age <= 20) ageGroups['18-20']++;
       else if (age >= 21 && age <= 25) ageGroups['21-25']++;
       else if (age >= 26 && age <= 40) ageGroups['26-40']++;
@@ -209,9 +221,14 @@ const Dashboard = ({ user, languageMode }) => {
     </div>
   );
 
+  const maxAgeCount = Math.max(...Object.values(stats.ageGroups || {}), 0);
+  const midAgeCount = Math.round(maxAgeCount / 2);
+
   return (
     <div className="dashboard-container" style={{
       padding: isMobile ? 'clamp(15px, 4vw, 20px)' : 'clamp(20px, 5vw, 40px)',
+      // Nudge the content closer to the left edge on desktop
+      paddingLeft: isMobile ? 'clamp(15px, 4vw, 20px)' : 'clamp(8px, 2.5vw, 18px)',
       background: 'var(--tvk-dark)',
       color: 'var(--tvk-cream)'
     }}>
@@ -310,14 +327,15 @@ const Dashboard = ({ user, languageMode }) => {
 
       <div className="dashboard-content" style={{
         display: 'grid',
-        gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-        gap: isMobile ? 'clamp(20px, 5vw, 30px)' : 'clamp(24px, 5vw, 32px)'
+        gridTemplateColumns: isMobile ? '1fr' : '1.3fr 1fr',
+        gap: isMobile ? 'clamp(20px, 5vw, 30px)' : 'clamp(40px, 7vw, 64px)'
       }}>
         <div className="gender-section" style={{
           background: 'rgba(255,255,255,0.03)',
           padding: 'clamp(20px, 5vw, 28px)',
-          borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.08)'
+          // Pull gender cards closer to the left edge on desktop
+          paddingLeft: isMobile ? 'clamp(20px, 5vw, 28px)' : 'clamp(8px, 2.5vw, 16px)',
+          borderRadius: '12px'
         }}>
           <h3 style={{
             fontSize: 'clamp(12px, 3vw, 14px)',
@@ -353,7 +371,8 @@ const Dashboard = ({ user, languageMode }) => {
           background: 'rgba(255,255,255,0.03)',
           padding: 'clamp(20px, 5vw, 28px)',
           borderRadius: '12px',
-          border: '1px solid rgba(255,255,255,0.08)'
+          // Push the age graph further to the right on desktop
+          marginLeft: isMobile ? 0 : 'clamp(16px, 4vw, 40px)'
         }}>
           <h3 style={{
             fontSize: 'clamp(12px, 3vw, 14px)',
@@ -373,15 +392,22 @@ const Dashboard = ({ user, languageMode }) => {
                 paddingRight: '10px',
                 textAlign: 'right'
               }}>
-                <span>{Math.max(...Object.values(stats.ageGroups)).toLocaleString()}</span>
+                <span>{maxAgeCount.toLocaleString()}</span>
+                <span>{midAgeCount.toLocaleString()}</span>
                 <span>0</span>
               </div>
               <div className="chart-area" style={{ flex: 1, borderLeft: '1px solid rgba(255,255,255,0.2)', borderBottom: '1px solid rgba(255,255,255,0.2)', position: 'relative', display: 'flex', justifyContent: 'space-around', alignItems: 'flex-end', padding: '0 10px' }}>
                 {Object.entries(stats.ageGroups).map(([range, count]) => {
-                  const maxAge = Math.max(...Object.values(stats.ageGroups));
-                  const height = maxAge > 0 ? (count / maxAge) * 100 : 0;
+                  const height = maxAgeCount > 0 ? (count / maxAgeCount) * 100 : 0;
                   return (
                     <div key={range} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', height: '100%', justifyContent: 'flex-end' }}>
+                      <div style={{
+                        fontSize: 'clamp(8px, 2vw, 9px)',
+                        color: 'rgba(255,255,255,0.85)',
+                        marginBottom: '4px'
+                      }}>
+                        {count.toLocaleString()}
+                      </div>
                       <div style={{
                         width: '70%',
                         height: `${height}%`,
@@ -399,6 +425,14 @@ const Dashboard = ({ user, languageMode }) => {
                   );
                 })}
               </div>
+            </div>
+            <div style={{
+              marginTop: '8px',
+              fontSize: 'clamp(9px, 2vw, 10px)',
+              color: 'rgba(255,255,255,0.6)',
+              textAlign: 'right'
+            }}>
+              {t.noOfVoters}
             </div>
           </div>
         </div>

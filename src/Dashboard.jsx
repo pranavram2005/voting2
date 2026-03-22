@@ -1,49 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import vote_AC002283 from "./voting/AC002283_with_roof";
-import vote_AC002284 from "./voting/AC002284_with_roof";
-import vote_AC005242 from "./voting/AC005242_with_roof";
-import vote_AC005243 from "./voting/AC005243_with_roof";
-import vote_AC005244 from "./voting/AC005244_with_roof";
-import vote_AC005245 from "./voting/AC005245_with_roof";
-import vote_AC005246 from "./voting/AC005246_with_roof";
-import vote_AC005247 from "./voting/AC005247_with_roof";
-import vote_AC005248 from "./voting/AC005248_with_roof";
-import vote_AC005249 from "./voting/AC005249_with_roof";
-import vote_AC005250 from "./voting/AC005250_with_roof";
-import vote_AC005251 from "./voting/AC005251_with_roof";
-import vote_AC005252 from "./voting/AC005252_with_roof";
-import vote_AC005253 from "./voting/AC005253_with_roof";
-import vote_AC005254 from "./voting/AC005254_with_roof";
-import vote_AC005255 from "./voting/AC005255_with_roof";
-import vote_AC005256 from "./voting/AC005256_with_roof";
-import vote_AC005257 from "./voting/AC005257_with_roof";
-import vote_AC005258 from "./voting/AC005258_with_roof";
-import vote_AC005259 from "./voting/AC005259_with_roof";
-import vote_AC005260 from "./voting/AC005260_with_roof";
+import data from "./voting/output.jsx"; // Import the combined data from output.jsx
 
 // Combine all voting data into one array
 const allVoteData = [
-  ...vote_AC002283,
-  ...vote_AC002284,
-  ...vote_AC005242,
-  ...vote_AC005243,
-  ...vote_AC005244,
-  ...vote_AC005245,
-  ...vote_AC005246,
-  ...vote_AC005247,
-  ...vote_AC005248,
-  ...vote_AC005249,
-  ...vote_AC005250,
-  ...vote_AC005251,
-  ...vote_AC005252,
-  ...vote_AC005253,
-  ...vote_AC005254,
-  ...vote_AC005255,
-  ...vote_AC005256,
-  ...vote_AC005257,
-  ...vote_AC005258,
-  ...vote_AC005259,
-  ...vote_AC005260,
+  ...data
 ];
 
 const Dashboard = ({ user, languageMode }) => {
@@ -106,24 +66,29 @@ const Dashboard = ({ user, languageMode }) => {
       '26-40': 0,
       '41-50': 0,
       '51-70+': 0
-    }
+    },
+    confirmedCount: 0,
+    confirmationPercent: 0
   });
 
   useEffect(() => {
     calculateStats();
-  }, []);
+  }, [user]); // Add user as dependency to recalculate when user changes
 
   const calculateStats = () => {
+    // For dashboard counts and confirmation percentage, always use full dataset
+    const filteredData = allVoteData;
+
     const constituencies = new Set();
     const wards = new Set();
     const taluks = new Set();
     const booths = new Set();
     const streets = new Set();
-    
+
     let maleCount = 0;
     let femaleCount = 0;
     let transgenderCount = 0;
-    
+
     const ageGroups = {
       '18-20': 0,
       '21-25': 0,
@@ -132,7 +97,7 @@ const Dashboard = ({ user, languageMode }) => {
       '51-70+': 0
     };
 
-    allVoteData.forEach(voter => {
+    filteredData.forEach(voter => {
       // Count unique locations
       if (voter.Constituency) constituencies.add(voter.Constituency);
       if (voter.Ward) wards.add(voter.Ward);
@@ -154,8 +119,24 @@ const Dashboard = ({ user, languageMode }) => {
       else if (age >= 51) ageGroups['51-70+']++;
     });
 
+    // Load confirmation data from localStorage
+    let confirmedCount = 0;
+    try {
+      if (typeof window !== 'undefined') {
+        const raw = localStorage.getItem('voterChecklists');
+        const parsed = raw ? JSON.parse(raw) : {};
+        confirmedCount = Object.values(parsed).filter((info) => info && info.confirmed).length;
+      }
+    } catch (e) {
+      confirmedCount = 0;
+    }
+
+    const confirmationPercent = filteredData.length > 0
+      ? (confirmedCount / filteredData.length) * 100
+      : 0;
+
     setStats({
-      totalVoters: allVoteData.length,
+      totalVoters: filteredData.length,
       constituencies: constituencies.size,
       wards: wards.size,
       taluks: taluks.size,
@@ -165,7 +146,9 @@ const Dashboard = ({ user, languageMode }) => {
       maleVoters: maleCount,
       femaleVoters: femaleCount,
       transgenderVoters: transgenderCount,
-      ageGroups
+      ageGroups,
+      confirmedCount,
+      confirmationPercent
     });
   };
 
@@ -232,6 +215,47 @@ const Dashboard = ({ user, languageMode }) => {
       background: 'var(--tvk-dark)',
       color: 'var(--tvk-cream)'
     }}>
+
+      {/* Overall confirmation progress for super admin */}
+      {user && user.role === 'super_admin' && (
+        <div style={{
+          marginBottom: isMobile ? '16px' : '24px',
+          padding: isMobile ? '12px' : '16px',
+          borderRadius: '12px',
+          border: '1px solid rgba(244,169,0,0.4)',
+          background: 'rgba(244,169,0,0.08)'
+        }}>
+          <div style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            gap: '8px',
+            marginBottom: '8px'
+          }}>
+            <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)', fontWeight: '600' }}>
+              Overall Vote Confirmation Progress
+            </div>
+            <div style={{ fontSize: '14px', color: '#F4A900', fontWeight: '700' }}>
+              {stats.confirmedCount.toLocaleString()} / {stats.totalVoters.toLocaleString()} voters confirmed ({stats.confirmationPercent.toFixed(1)}%)
+            </div>
+          </div>
+          <div style={{
+            width: '100%',
+            height: '16px',
+            borderRadius: '999px',
+            background: 'rgba(0,0,0,0.4)',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${stats.confirmationPercent}%`,
+              height: '100%',
+              background: 'linear-gradient(90deg, #2ECC71, #27AE60, #2ECC71)',
+              transition: 'width 0.3s ease'
+            }} />
+          </div>
+        </div>
+      )}
 
       <div className="stats-grid" style={{
         display: 'grid',

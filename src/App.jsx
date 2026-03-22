@@ -5,6 +5,8 @@ import Dashboard from './Dashboard';
 import SimpleDataViewer from './SimpleDataViewer';
 import Header from './Header';
 import HomePage from './Home';
+import AddBoothAgent from './AddBoothAgent';
+import ConfirmationsAdmin from './ConfirmationsAdmin';
 
 const App = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -28,7 +30,7 @@ const App = () => {
     }
   }, []);
 
-  // Handle URL routing for authenticated users
+      // Handle URL routing for authenticated users
   useEffect(() => {
     if (isAuthenticated) {
       const handlePopState = () => {
@@ -37,19 +39,27 @@ const App = () => {
           setCurrentPage('dashboard');
         } else if (path === '/voters') {
           setCurrentPage('voters');
+        } else if (path === '/add-booth-agent') {
+          setCurrentPage('addBoothAgent');
+        } else if (path === '/confirmations') {
+          setCurrentPage('confirmations');
         } else {
           setCurrentPage('home');
         }
       };
 
       window.addEventListener('popstate', handlePopState);
-      
+
       // Set initial page based on URL
       const path = window.location.pathname;
       if (path === '/voters') {
         setCurrentPage('voters');
       } else if (path === '/dashboard') {
         setCurrentPage('dashboard');
+      } else if (path === '/add-booth-agent') {
+        setCurrentPage('addBoothAgent');
+      } else if (path === '/confirmations') {
+        setCurrentPage('confirmations');
       } else {
         setCurrentPage('home');
         window.history.replaceState({}, '', '/');
@@ -91,6 +101,10 @@ const App = () => {
       window.history.pushState({}, '', '/dashboard');
     } else if (page === 'voters') {
       window.history.pushState({}, '', '/voters');
+    } else if (page === 'addBoothAgent') {
+      window.history.pushState({}, '', '/add-booth-agent');
+    } else if (page === 'confirmations') {
+      window.history.pushState({}, '', '/confirmations');
     }
   };
 
@@ -137,14 +151,26 @@ const App = () => {
         {currentPage === 'home' ? (
           <HomePage languageMode={languageMode} />
         ) : currentPage === 'dashboard' ? (
-          <Dashboard 
-            user={currentUser} 
+          <Dashboard
+            user={currentUser}
+            languageMode={languageMode}
+          />
+        ) : currentPage === 'addBoothAgent' ? (
+          <AddBoothAgent
+            languageMode={languageMode}
+            user={currentUser}
+            onNavigate={handleNavigation}
+          />
+        ) : currentPage === 'confirmations' ? (
+          <ConfirmationsAdmin
+            user={currentUser}
             languageMode={languageMode}
           />
         ) : (
-          <SimpleDataViewer 
+          <SimpleDataViewer
             languageMode={languageMode}
             onToggleLanguage={toggleLanguage}
+            user={currentUser}
           />
         )}
       </div>

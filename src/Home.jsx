@@ -1,8 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import voteData from './voting/output.jsx';
 
 export default function HomePage({ languageMode = 'tamil' }) {
   const navigate = useNavigate();
+
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [confirmationStats, setConfirmationStats] = useState({
+    totalVoters: 0,
+    totalConfirmed: 0,
+    confirmationPercent: 0,
+    perAgent: {}
+  });
 
   // Translation texts
   const translations = {
@@ -192,6 +201,70 @@ export default function HomePage({ languageMode = 'tamil' }) {
     { name: 'திருநெல்வேலி (Tirunelveli)', strength: '26.1%', votes: '26' },
     { name: 'வேலூர் (Vellore)', strength: '33.5%', votes: '34' }
   ];
+
+  useEffect(() => {
+    try {
+      const storedUser = localStorage.getItem('currentUser');
+      if (storedUser) {
+        const parsed = JSON.parse(storedUser);
+        if (parsed && parsed.role === 'super_admin') {
+          setIsSuperAdmin(true);
+        }
+      }
+    } catch (e) {
+      setIsSuperAdmin(false);
+    }
+
+    try {
+      const allVoteData = voteData || [];
+      const rawChecklists = localStorage.getItem('voterChecklists');
+      const parsedChecklists = rawChecklists ? JSON.parse(rawChecklists) : {};
+      const confirmedEntries = Object.entries(parsedChecklists).filter(([, info]) => info && info.confirmed);
+
+      const totalVoters = allVoteData.length || 0;
+      const totalConfirmed = confirmedEntries.length;
+      const confirmationPercent = totalVoters > 0 ? (totalConfirmed / totalVoters) * 100 : 0;
+
+      const perAgentMap = {};
+      confirmedEntries.forEach(([, info]) => {
+        const agent = info.confirmedBy || 'Unknown';
+        if (!perAgentMap[agent]) {
+          perAgentMap[agent] = {
+            count: 0,
+            boothNumbers: new Set()
+          };
+        }
+        perAgentMap[agent].count += 1;
+        if (info.boothNumber) {
+          perAgentMap[agent].boothNumbers.add(String(info.boothNumber));
+        }
+      });
+
+      const perAgent = Object.fromEntries(
+        Object.entries(perAgentMap).map(([agent, info]) => [
+          agent,
+          {
+            count: info.count,
+            boothNumbers: Array.from(info.boothNumbers || [])
+          }
+        ])
+      );
+
+      setConfirmationStats({
+        totalVoters,
+        totalConfirmed,
+        confirmationPercent,
+        perAgent
+      });
+    } catch (e) {
+      setConfirmationStats({
+        totalVoters: 0,
+        totalConfirmed: 0,
+        confirmationPercent: 0,
+        perAgent: {}
+      });
+    }
+  }, []);
 
   return (
     <div className="home-container" style={{
@@ -414,6 +487,131 @@ export default function HomePage({ languageMode = 'tamil' }) {
           </div>
         </div>
       </section>
+
+      {isSuperAdmin && (
+        <section style={{
+          padding: '32px 24px',
+          background: 'rgba(255,255,255,0.01)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          borderBottom: '1px solid rgba(255,255,255,0.08)'
+        }}>
+          <div style={{
+            maxWidth: '1080px',
+            margin: '0 auto'
+          }}>
+            <h2 style={{
+              fontSize: '20px',
+              color: '#F4A900',
+              marginBottom: '12px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span>✅</span>
+              <span>TVK Victory</span>
+            </h2>
+
+            <div style={{
+              marginBottom: '20px',
+              padding: '16px',
+              borderRadius: '12px',
+              border: '1px solid rgba(244,169,0,0.3)',
+              background: 'rgba(244,169,0,0.05)'
+            }}>
+              <div style={{
+                display: 'flex',
+                flexDirection: window.innerWidth <= 768 ? 'column' : 'row',
+                justifyContent: 'space-between',
+                gap: '12px',
+                marginBottom: '10px'
+              }}>
+                <div>
+                  <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>
+                    Total voters in database
+                  </div>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+                    {confirmationStats.totalVoters.toLocaleString()}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>
+                    Confirmed by booth agents
+                  </div>
+                  <div style={{ fontSize: '20px', fontWeight: 'bold' }}>
+                    {confirmationStats.totalConfirmed.toLocaleString()} ({confirmationStats.confirmationPercent.toFixed(1)}%)
+                  </div>
+                </div>
+              </div>
+              <div style={{
+                width: '100%',
+                height: '16px',
+                borderRadius: '999px',
+                background: 'rgba(255,255,255,0.08)',
+                overflow: 'hidden'
+              }}>
+                <div style={{
+                  width: `${confirmationStats.confirmationPercent}%`,
+                  height: '100%',
+                  background: 'linear-gradient(90deg, #2ECC71, #27AE60, #2ECC71)',
+                  transition: 'width 0.3s ease'
+                }} />
+              </div>
+            </div>
+
+            <div style={{
+              padding: '16px',
+              borderRadius: '12px',
+              border: '1px solid rgba(255,255,255,0.12)',
+              background: 'rgba(255,255,255,0.03)'
+            }}>
+              <h3 style={{
+                fontSize: '16px',
+                marginBottom: '10px',
+                color: '#F4A900'
+              }}>
+                Per Booth Agent Summary
+              </h3>
+              {Object.keys(confirmationStats.perAgent).length === 0 ? (
+                <div style={{ fontSize: '14px', color: 'rgba(255,255,255,0.7)' }}>
+                  No confirmed votes recorded yet.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{
+                    width: '100%',
+                    borderCollapse: 'collapse',
+                    fontSize: '13px'
+                  }}>
+                    <thead>
+                      <tr style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        borderBottom: '1px solid rgba(255,255,255,0.15)'
+                      }}>
+                        <th style={{ padding: '8px', textAlign: 'left' }}>Agent</th>
+                        <th style={{ padding: '8px', textAlign: 'left' }}>Booth(s)</th>
+                        <th style={{ padding: '8px', textAlign: 'right' }}>Confirmed Votes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(confirmationStats.perAgent).map(([agent, info]) => (
+                        <tr key={agent} style={{
+                          borderBottom: '1px solid rgba(255,255,255,0.06)'
+                        }}>
+                          <td style={{ padding: '8px' }}>{agent}</td>
+                          <td style={{ padding: '8px' }}>{(info.boothNumbers || []).join(', ') || '-'}</td>
+                          <td style={{ padding: '8px', textAlign: 'right' }}>
+                            {info.count.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Voter Analysis Section */}
       <section style={{

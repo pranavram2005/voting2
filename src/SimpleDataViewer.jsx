@@ -1,25 +1,5 @@
-import React, { useState, useEffect, useMemo } from "react";
-import vote_AC002283 from "./voting/AC002283_with_roof";
-import vote_AC002284 from "./voting/AC002284_with_roof";
-import vote_AC005242 from "./voting/AC005242_with_roof";
-import vote_AC005243 from "./voting/AC005243_with_roof";
-import vote_AC005244 from "./voting/AC005244_with_roof";
-import vote_AC005245 from "./voting/AC005245_with_roof";
-import vote_AC005246 from "./voting/AC005246_with_roof";
-import vote_AC005247 from "./voting/AC005247_with_roof";
-import vote_AC005248 from "./voting/AC005248_with_roof";
-import vote_AC005249 from "./voting/AC005249_with_roof";
-import vote_AC005250 from "./voting/AC005250_with_roof";
-import vote_AC005251 from "./voting/AC005251_with_roof";
-import vote_AC005252 from "./voting/AC005252_with_roof";
-import vote_AC005253 from "./voting/AC005253_with_roof";
-import vote_AC005254 from "./voting/AC005254_with_roof";
-import vote_AC005255 from "./voting/AC005255_with_roof";
-import vote_AC005256 from "./voting/AC005256_with_roof";
-import vote_AC005257 from "./voting/AC005257_with_roof";
-import vote_AC005258 from "./voting/AC005258_with_roof";
-import vote_AC005259 from "./voting/AC005259_with_roof";
-import vote_AC005260 from "./voting/AC005260_with_roof";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import data from "./voting/output.jsx"; // Import the combined data from output.jsx
 import "./styles.css";
 
 // TVK Theme Helper Components
@@ -205,33 +185,14 @@ if (typeof document !== 'undefined') {
   document.head.appendChild(styleSheet);
 }
 
-// Combine all voting data into one array
-const allVoteData = [
-  ...vote_AC002283,
-  ...vote_AC002284,
-  ...vote_AC005242,
-  ...vote_AC005243,
-  ...vote_AC005244,
-  ...vote_AC005245,
-  ...vote_AC005246,
-  ...vote_AC005247,
-  ...vote_AC005248,
-  ...vote_AC005249,
-  ...vote_AC005250,
-  ...vote_AC005251,
-  ...vote_AC005252,
-  ...vote_AC005253,
-  ...vote_AC005254,
-  ...vote_AC005255,
-  ...vote_AC005256,
-  ...vote_AC005257,
-  ...vote_AC005258,
-  ...vote_AC005259,
-  ...vote_AC005260,
-];
+// Combine all voting data into one array (from JSON)
+const allVoteData = data;
 
-const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
+const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const tableRef = useRef(null);
+  const printPreviewRef = useRef(null);
+  const [showPrintPreview, setShowPrintPreview] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -248,6 +209,13 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
   const [showRoofMembers, setShowRoofMembers] = useState(false);
   const [roofMembers, setRoofMembers] = useState([]);
   const [familyMembers, setFamilyMembers] = useState([]);
+  const [voterChecklist, setVoterChecklist] = useState({
+    needs: "",
+    needsOther: "",
+    phone: "",
+    confirmed: false,
+  });
+  const [checklistSavedMessage, setChecklistSavedMessage] = useState("");
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -255,8 +223,8 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
   
   const [filters, setFilters] = useState({
     constituency: "",
-    villages: [], // Nagar
-    streets: [],  // Street (Division)
+    villages: [], // Street (SECTION_NAME)
+    streets: [],  // (no longer used UI-wise)
     booths: [],   // Booth (Part)
     wards: [],    // Ward
     voterId: "",
@@ -278,36 +246,77 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
   });
 
   useEffect(() => {
-    setData(allVoteData);
-    // Initialize suggestions
-    const names = [...new Set(allVoteData.map(item => item.Name))].filter(n => n).sort();
-    const pdfNos = [...new Set(allVoteData.map(item => item.Page))].filter(p => p).sort();
+    // Filter data based on user role
+    let filteredData = allVoteData;
+
+    if (user && user.role === 'booth_agent' && user.boothNumber) {
+      // For booth agents, only show data from their assigned booth (based on BOOTH)
+      filteredData = allVoteData.filter(voter =>
+        voter.BOOTH && voter.BOOTH.toString() === user.boothNumber.toString()
+      );
+    }
+
+    setData(filteredData);
+
+    // Initialize suggestions from filtered data (use NAME_EN and SECTION as substitutes)
+    const names = [...new Set(filteredData.map(item => item.NAME_EN))].filter(n => n).sort();
+    const pdfNos = [...new Set(filteredData.map(item => item.SECTION))].filter(p => p).sort();
     setSuggestions({ names, pdfNos });
-  }, []);
+  }, [user]); // Add user as dependency
+
+  // Load checklist info whenever a voter is selected
+  useEffect(() => {
+    if (!selectedVoter || !selectedVoter["EPIC"]) {
+      setVoterChecklist({ needs: "", phone: "", confirmed: false });
+      setChecklistSavedMessage("");
+      return;
+    }
+    try {
+      const epic = String(selectedVoter["EPIC"]);
+      const stored = typeof window !== "undefined" ? localStorage.getItem("voterChecklists") : null;
+      const all = stored ? JSON.parse(stored) : {};
+      const existing = all[epic] || {};
+      setVoterChecklist({
+        needs: existing.needs || "",
+        needsOther: existing.needsOther || "",
+        phone: existing.phone || "",
+        confirmed: !!existing.confirmed,
+      });
+      setChecklistSavedMessage("");
+    } catch (e) {
+      // Fallback to empty if parsing fails
+      setVoterChecklist({ needs: "", needsOther: "", phone: "", confirmed: false });
+      setChecklistSavedMessage("");
+    }
+  }, [selectedVoter]);
 
   const columns = useMemo(() => {
     if (data.length === 0) return [];
-    // Define the order of columns for better display
+    // Define the order of columns (One Roof fields moved to the right, IS_DELETED removed)
     const orderedColumns = [
       "S.No",
-      "Position", 
-      "Name",
+      "AC_NAME",
+      "SECTION",
+      "SECTION_NAME",
+      "BOOTH",
+      "SL",
+      "EPIC",
+      "HOUSE",
+      "NAME_T",
+      "NAME_EN",
+      "R_TYPE",
+      "R_Name",
+      "REL_EN",
+      "AGE",
+      "GENDER",
+      "DOB",
+      "MOBILE",
+      "BOOTH NAME",
+      "BOOTH NAME TAMIL",
       "One Roof",
-      "One Roof Running Number",
-      "Relation Type",
-      "Relative Name",
-      "House No",
-      "Age",
-      "Gender",
-      "ID Code",
-      "Page",
-      "Constituency",
-      "Division", 
-      "Village",
-      "Ward",
-      "Part"
+      "One Roof Running Number"
     ];
-    
+
     const availableColumns = Object.keys(data[0]).filter(col => !["Photo"].includes(col));
     
     // Return columns in the specified order, then any additional columns
@@ -348,7 +357,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
   };
 
   const getUniqueRelationTypes = () => {
-    const values = [...new Set(data.map((item) => normalizeRelationType(item["Relation Type"])))];
+    const values = [...new Set(data.map((item) => normalizeRelationType(item["R_TYPE"])))];
     return values.filter((v) => v !== undefined && v !== null && v !== "").sort();
   };
 
@@ -358,11 +367,11 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
     const filterDataExcluding = (excludeFilter) => {
       return data.filter((item) => {
         return (
-          (excludeFilter === 'constituency' || filters.constituency === "" || item["Constituency"] === filters.constituency) &&
-          (excludeFilter === 'villages' || filters.villages.length === 0 || filters.villages.includes(item["Village"])) &&
-          (excludeFilter === 'streets' || filters.streets.length === 0 || filters.streets.includes(item["Division"])) &&
-          (excludeFilter === 'booths' || filters.booths.length === 0 || filters.booths.includes(item["Part"])) &&
-          (excludeFilter === 'wards' || filters.wards.length === 0 || filters.wards.includes(item["Ward"]))
+          (excludeFilter === 'constituency' || filters.constituency === "" || item["AC_NAME"] === filters.constituency) &&
+          (excludeFilter === 'villages' || filters.villages.length === 0 || filters.villages.includes(item["SECTION_NAME"])) &&
+          (excludeFilter === 'streets' || filters.streets.length === 0 || filters.streets.includes(item["HOUSE"])) &&
+          (excludeFilter === 'booths' || filters.booths.length === 0 || filters.booths.includes(item["BOOTH"])) &&
+          (excludeFilter === 'wards' || filters.wards.length === 0 || filters.wards.includes(item["SECTION"]))
         );
       });
     };
@@ -373,11 +382,10 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
     };
 
     return {
-      constituencies: getUniqueFromFiltered(filterDataExcluding('constituency'), "Constituency"),
-      villages: getUniqueFromFiltered(filterDataExcluding('villages'), "Village"),
-      streets: getUniqueFromFiltered(filterDataExcluding('streets'), "Division"),
-      booths: getUniqueFromFiltered(filterDataExcluding('booths'), "Part"),
-      wards: getUniqueFromFiltered(filterDataExcluding('wards'), "Ward"),
+      constituencies: getUniqueFromFiltered(filterDataExcluding('constituency'), "AC_NAME"),
+      villages: getUniqueFromFiltered(filterDataExcluding('villages'), "SECTION_NAME"),
+      booths: getUniqueFromFiltered(filterDataExcluding('booths'), "BOOTH"),
+      wards: getUniqueFromFiltered(filterDataExcluding('wards'), "SECTION"),
     };
   }, [data, filters.constituency, filters.villages, filters.streets, filters.booths, filters.wards]);
 
@@ -396,13 +404,6 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
     const validVillages = filters.villages.filter(v => availableFilterOptions.villages.includes(v));
     if (validVillages.length !== filters.villages.length) {
       newFilters.villages = validVillages;
-      needsUpdate = true;
-    }
-
-    // Check streets
-    const validStreets = filters.streets.filter(s => availableFilterOptions.streets.includes(s));
-    if (validStreets.length !== filters.streets.length) {
-      newFilters.streets = validStreets;
       needsUpdate = true;
     }
 
@@ -429,34 +430,32 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
     return data.filter((item) => {
       return (
         // Constituency filter
-        (filters.constituency === "" || item["Constituency"] === filters.constituency) &&
+        (filters.constituency === "" || item["AC_NAME"] === filters.constituency) &&
         // Village filter (multiple selection)
-        (filters.villages.length === 0 || filters.villages.includes(item["Village"])) &&
-        // Street filter (multiple selection) - using Division as Street
-        (filters.streets.length === 0 || filters.streets.includes(item["Division"])) &&
-        // Booth filter (multiple selection) using Part
-        (filters.booths.length === 0 || filters.booths.includes(item["Part"])) &&
-        // Ward filter (multiple selection)
-        (filters.wards.length === 0 || filters.wards.includes(item["Ward"])) &&
-        // Voter ID filter (substring match, case-insensitive)
-        (filters.voterId === "" || String(item["ID Code"]).trim().toLowerCase().includes(filters.voterId.trim().toLowerCase())) &&
-        // House No filter (exact match)
-        (filters.houseNo === "" || String(item["House No"]).toLowerCase() === filters.houseNo.toLowerCase()) &&
+        (filters.villages.length === 0 || filters.villages.includes(item["SECTION_NAME"])) &&
+        // Booth filter (multiple selection) using BOOTH
+        (filters.booths.length === 0 || filters.booths.includes(item["BOOTH"])) &&
+        // Ward filter (multiple selection) using numeric SECTION
+        (filters.wards.length === 0 || filters.wards.includes(item["SECTION"])) &&
+        // Voter ID filter (substring match, case-insensitive) using EPIC
+        (filters.voterId === "" || String(item["EPIC"]).trim().toLowerCase().includes(filters.voterId.trim().toLowerCase())) &&
+        // House No filter (exact match) using HOUSE
+        (filters.houseNo === "" || String(item["HOUSE"]).toLowerCase() === filters.houseNo.toLowerCase()) &&
         // Serial No filter (exact match)
         (filters.serialNo === "" || String(item["S.No"]) === filters.serialNo) &&
-        // Name filter (text search)
-        (filters.name === "" || String(item["Name"]).toLowerCase().includes(filters.name.toLowerCase())) &&
-        // Relation filter (with normalization)
-        (filters.relation === "" || normalizeRelationType(item["Relation Type"]) === normalizeRelationType(filters.relation)) &&
-        // Relative Name filter (shown only when relation selected)
-        (filters.relativeName === "" || String(item["Relative Name"]).toLowerCase().includes(filters.relativeName.toLowerCase())) &&
+        // Name filter (text search) using English name
+        (filters.name === "" || String(item["NAME_EN"]).toLowerCase().includes(filters.name.toLowerCase())) &&
+        // Relation filter (with normalization) using R_TYPE
+        (filters.relation === "" || normalizeRelationType(item["R_TYPE"]) === normalizeRelationType(filters.relation)) &&
+        // Relative Name filter (shown only when relation selected) using R_Name
+        (filters.relativeName === "" || String(item["R_Name"]).toLowerCase().includes(filters.relativeName.toLowerCase())) &&
         // Age range filter
-        (filters.ageFrom === "" || Number(item["Age"]) >= Number(filters.ageFrom)) &&
-        (filters.ageTo === "" || Number(item["Age"]) <= Number(filters.ageTo)) &&
+        (filters.ageFrom === "" || Number(item["AGE"]) >= Number(filters.ageFrom)) &&
+        (filters.ageTo === "" || Number(item["AGE"]) <= Number(filters.ageTo)) &&
         // Gender filter (with normalization)
-        (filters.gender === "" || normalizeGender(item["Gender"]) === filters.gender) &&
-        // PDF No filter exact match (Page)
-        (filters.pdfNo === "" || String(item["Page"]).toLowerCase() === filters.pdfNo.toLowerCase()) &&
+        (filters.gender === "" || normalizeGender(item["GENDER"]) === filters.gender) &&
+        // PDF No filter exact match (using SECTION as a stand-in)
+        (filters.pdfNo === "" || String(item["SECTION"]).toLowerCase() === filters.pdfNo.toLowerCase()) &&
         // One Roof filter (exact match)
         (filters.oneRoof === "" || String(item["One Roof"]) === filters.oneRoof) &&
         // One Roof Running Number filter (exact match)
@@ -530,6 +529,37 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
     setSelectedVoter(voter);
     setSelectedRowIndex(index);
     setShowDetailView(true);
+  };
+
+  const handleChecklistFieldChange = (field, value) => {
+    setVoterChecklist((prev) => ({ ...prev, [field]: value }));
+    setChecklistSavedMessage("");
+  };
+
+  const handleSaveChecklist = () => {
+    if (!selectedVoter || !selectedVoter["EPIC"]) return;
+    try {
+      const epic = String(selectedVoter["EPIC"]);
+      const stored = typeof window !== "undefined" ? localStorage.getItem("voterChecklists") : null;
+      const all = stored ? JSON.parse(stored) : {};
+      const updated = {
+        ...(all[epic] || {}),
+        needs: voterChecklist.needs || "",
+        needsOther: voterChecklist.needsOther || "",
+        phone: voterChecklist.phone || "",
+        confirmed: !!voterChecklist.confirmed,
+        confirmedBy: user && user.username ? user.username : (user && user.fullName) || "Unknown",
+        confirmedAt: new Date().toISOString(),
+        boothNumber: user && user.boothNumber ? user.boothNumber : null,
+      };
+      all[epic] = updated;
+      if (typeof window !== "undefined") {
+        localStorage.setItem("voterChecklists", JSON.stringify(all));
+      }
+      setChecklistSavedMessage("Saved successfully");
+    } catch (e) {
+      setChecklistSavedMessage("Could not save, please try again");
+    }
   };
 
   const closeDetailView = () => {
@@ -633,8 +663,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
       selectConstituency: "Select Constituency",
       booth: "Booth (Part) - Multiple Selection",
       ward: "Ward - Multiple Selection", 
-      village: "Village - Multiple Selection",
-      street: "Street - Multiple Selection",
+      village: "Street - Multiple Selection",
       personalFilters: "👤 Personal Filters",
       voterIdSearch: "Voter ID Search",
       houseNumber: "House Number",
@@ -684,6 +713,28 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
   };
 
   const t = translations[languageMode];
+  const openPrintPreview = () => {
+    setShowPrintPreview(true);
+  };
+
+  const handleDownloadPdf = async () => {
+    try {
+      if (!printPreviewRef.current) return;
+      const html2pdf = (await import("html2pdf.js")).default;
+
+      const opt = {
+        margin: 0.5,
+        filename: "voters-table.pdf",
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: "in", format: "a4", orientation: "landscape" }
+      };
+
+      html2pdf().set(opt).from(printPreviewRef.current).save();
+    } catch (e) {
+      window.print();
+    }
+  };
 
   return (
     <div style={{
@@ -840,21 +891,12 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
             <div style={{ height: isMobile ? '0' : '24px' }}></div> {/* Spacer */}
             
-            {/* Village Filter */}
+            {/* Street Filter (using SECTION_NAME) */}
             <TVKFilterGroup label={`4. ${t.village}`}>
               <TVKMultiSelect 
                 options={availableFilterOptions.villages}
                 selected={filters.villages}
                 onChange={(value) => handleMultiSelectChange('villages', value)}
-              />
-            </TVKFilterGroup>
-            
-            {/* Street Filter */}
-            <TVKFilterGroup label={`5. ${t.street}`}>
-              <TVKMultiSelect 
-                options={availableFilterOptions.streets}
-                selected={filters.streets}
-                onChange={(value) => handleMultiSelectChange('streets', value)}
               />
             </TVKFilterGroup>
           </div>
@@ -1169,7 +1211,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
                 {paginatedData.length} {t.of} {filteredData.length} {t.records}
               </div>
               <button
-                onClick={() => window.print()}
+                onClick={openPrintPreview}
                 style={{
                   background: 'linear-gradient(135deg, #F4A900, #FFD700)',
                   border: 'none',
@@ -1388,7 +1430,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
           borderRadius: '8px',
           margin: isMobile ? '15px' : '20px',
           border: '1px solid rgba(255,255,255,0.08)'
-        }}>
+        }} ref={tableRef}>
           <table style={{
             width: '100%',
             minWidth: '1200px', // Force scroll on smaller screens
@@ -1475,16 +1517,154 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
         )}
       </div>
 
+      {/* Print Preview Overlay with Excel-style table */}
+      {showPrintPreview && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.85)',
+            zIndex: 2000,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setShowPrintPreview(false)}
+        >
+          <div
+            ref={printPreviewRef}
+            style={{
+              backgroundColor: '#ffffff',
+              color: '#000000',
+              maxWidth: '1200px',
+              maxHeight: '90vh',
+              width: '100%',
+              borderRadius: '8px',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.4)',
+              display: 'flex',
+              flexDirection: 'column',
+              overflow: 'hidden'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: '10px 16px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                borderBottom: '1px solid #ccc',
+                background: '#f5f5f5'
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: '14px' }}>
+                {t.voterData} – {filteredData.length.toLocaleString()} {t.records}
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={handleDownloadPdf}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '12px',
+                    background: '#2ecc71',
+                    border: '1px solid #27ae60',
+                    color: '#ffffff',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  Download PDF
+                </button>
+                <button
+                  onClick={() => setShowPrintPreview(false)}
+                  style={{
+                    padding: '6px 10px',
+                    fontSize: '12px',
+                    background: '#e0e0e0',
+                    border: '1px solid #bbb',
+                    color: '#333',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    fontWeight: 500
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+            <div
+              style={{
+                flex: 1,
+                overflow: 'auto',
+                padding: '12px'
+              }}
+            >
+              <table
+                style={{
+                  width: '100%',
+                  borderCollapse: 'collapse',
+                  tableLayout: 'fixed',
+                  fontSize: '10px',
+                  fontFamily: 'system-ui, -apple-system, sans-serif'
+                }}
+              >
+                <thead>
+                  <tr>
+                    {columns.map((header) => (
+                      <th
+                        key={header}
+                        style={{
+                          border: '1px solid #999',
+                          padding: '4px 6px',
+                          textAlign: 'left',
+                          backgroundColor: '#f2f2f2',
+                          fontWeight: 600,
+                          whiteSpace: 'nowrap'
+                        }}
+                      >
+                        {t[header] || header}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredData.map((row, rowIndex) => (
+                    <tr key={row.id || rowIndex}>
+                      {columns.map((header) => (
+                        <td
+                          key={header}
+                          style={{
+                            border: '1px solid #ddd',
+                            padding: '3px 6px',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis'
+                          }}
+                        >
+                          {row[header]}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
       <p className="entry-count">
         Showing <b>{startIndex + 1}-{Math.min(endIndex, filteredData.length)}</b> of <b>{filteredData.length}</b> filtered entries (Total: {data.length})
         {data.length > 0 && (
           <span style={{marginLeft: '20px', fontSize: '14px', color: '#888'}}>
-            Columns: {8}
+            Columns: {columns.length}
           </span>
         )}
         {selectedRowIndex !== null && selectedVoter && (
           <span style={{marginLeft: '20px', fontSize: '16px', color: '#000', fontWeight: 'bold'}}>
-            Selected: {selectedVoter["Name"]} (ID: {selectedVoter["ID Code"]})
+            Selected: {selectedVoter["NAME_EN"]} (ID: {selectedVoter["EPIC"]})
             <button 
               onClick={() => {setSelectedRowIndex(null); setSelectedVoter(null);}} 
               style={{
@@ -1583,6 +1763,141 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
               maxHeight: 'calc(90vh - 100px)',
               overflow: 'auto'
             }}>
+              {/* Booth Agent Checklist Section */}
+              {user && user.role === 'booth_agent' && (
+                <div style={{
+                  marginBottom: '24px',
+                  padding: '16px',
+                  borderRadius: '12px',
+                  border: '1px solid rgba(244,169,0,0.3)',
+                  background: 'rgba(244,169,0,0.06)'
+                }}>
+                  <h3 style={{
+                    color: '#F4A900',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <span>✅</span> Voter Needs & Confirmation
+                  </h3>
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr',
+                    gap: '12px',
+                    marginBottom: '12px'
+                  }}>
+                    <div>
+                      <label style={{
+                        display: 'block',
+                        marginBottom: '6px',
+                        fontSize: '12px',
+                        color: 'rgba(255,255,255,0.7)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px'
+                      }}>Needs</label>
+                      <select
+                        value={voterChecklist.needs}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          handleChecklistFieldChange('needs', value);
+                          if (value !== 'Others') {
+                            handleChecklistFieldChange('needsOther', '');
+                          }
+                        }}
+                        style={tvkSelectStyle}
+                      >
+                        <option value="">Select Need</option>
+                        <option value="Medical needs">Medical needs</option>
+                        <option value="Education support">Education support</option>
+                        <option value="Job oppuritnites">Job oppuritnites</option>
+                        <option value="Agriculture Support">Agriculture Support</option>
+                        <option value="Marriage Assitance">Marriage Assitance</option>
+                        <option value="Basic Needs">Basic Needs</option>
+                        <option value="Health Care">Health Care</option>
+                        <option value="Financial Needs">Financial Needs</option>
+                        <option value="Others">Others</option>
+                      </select>
+                      {voterChecklist.needs === 'Others' && (
+                        <input
+                          type="text"
+                          value={voterChecklist.needsOther}
+                          onChange={(e) => handleChecklistFieldChange('needsOther', e.target.value)}
+                          placeholder="Enter other specific needs"
+                          style={{
+                            ...tvkInputStyle,
+                            marginTop: '8px'
+                          }}
+                        />
+                      )}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                      <div>
+                        <label style={{
+                          display: 'block',
+                          marginBottom: '6px',
+                          fontSize: '12px',
+                          color: 'rgba(255,255,255,0.7)',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px'
+                        }}>Phone Number</label>
+                        <input
+                          type="tel"
+                          value={voterChecklist.phone}
+                          onChange={(e) => handleChecklistFieldChange('phone', e.target.value)}
+                          placeholder="Enter contact number"
+                          style={tvkInputStyle}
+                        />
+                      </div>
+                      <label style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        fontSize: '13px',
+                        color: 'rgba(255,255,255,0.9)'
+                      }}>
+                        <input
+                          type="checkbox"
+                          checked={voterChecklist.confirmed}
+                          onChange={(e) => handleChecklistFieldChange('confirmed', e.target.checked)}
+                          style={{ accentColor: '#2ECC71' }}
+                        />
+                        Mark vote as confirmed
+                      </label>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <button
+                      onClick={handleSaveChecklist}
+                      style={{
+                        background: 'linear-gradient(135deg, #2ECC71, #27AE60)',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        padding: '10px 18px',
+                        fontSize: '13px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        letterSpacing: '0.5px',
+                        textTransform: 'uppercase'
+                      }}
+                    >
+                      Save Checklist
+                    </button>
+                    {checklistSavedMessage && (
+                      <span style={{
+                        fontSize: '12px',
+                        color: checklistSavedMessage.includes('Saved') ? '#2ECC71' : '#E74C3C'
+                      }}>
+                        {checklistSavedMessage}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Personal Information Section */}
               <div style={{ marginBottom: '24px' }}>
                 <h3 style={{
@@ -1603,7 +1918,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
                   gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
                   gap: isMobile ? '15px' : '20px'
                 }}>
-                  {['Name', 'Age', 'Gender', 'Relation Type', 'Relative Name'].map(key => (
+                  {['NAME_EN', 'AGE', 'GENDER', 'R_TYPE', 'R_Name'].map(key => (
                     selectedVoter[key] && (
                       <div key={key} style={{
                         background: 'rgba(255,255,255,0.03)',
@@ -1651,7 +1966,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
                   gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
                   gap: isMobile ? '15px' : '20px'
                 }}>
-                  {['ID Code', 'S.No', 'Constituency', 'Part', 'Page', 'Position'].map(key => (
+                  {['EPIC', 'S.No', 'AC_NAME', 'BOOTH', 'SECTION', 'SL'].map(key => (
                     selectedVoter[key] && (
                       <div key={key} style={{
                         background: 'rgba(255,255,255,0.03)',
@@ -1699,7 +2014,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
                   gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
                   gap: isMobile ? '15px' : '20px'
                 }}>
-                  {['House No', 'Division', 'Village', 'Ward', 'One Roof', 'One Roof Running Number'].map(key => (
+                  {['HOUSE', 'SECTION_NAME', 'BOOTH NAME', 'BOOTH NAME TAMIL', 'One Roof', 'One Roof Running Number'].map(key => (
                     selectedVoter[key] && (
                       <div key={key} style={{
                         background: 'rgba(255,255,255,0.03)',
@@ -1728,7 +2043,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
               </div>
 
               {/* Other Information Section (Catch-all) */}
-              {Object.keys(selectedVoter).filter(key => !['Name', 'Age', 'Gender', 'Relation Type', 'Relative Name', 'ID Code', 'S.No', 'Constituency', 'Part', 'Page', 'Position', 'House No', 'Division', 'Village', 'Ward', 'One Roof', 'One Roof Running Number'].includes(key)).length > 0 && (
+              {Object.keys(selectedVoter).filter(key => !['NAME_EN', 'AGE', 'GENDER', 'R_TYPE', 'R_Name', 'EPIC', 'S.No', 'AC_NAME', 'BOOTH', 'SECTION', 'SL', 'HOUSE', 'SECTION_NAME', 'BOOTH NAME', 'BOOTH NAME TAMIL', 'One Roof', 'One Roof Running Number'].includes(key)).length > 0 && (
                 <div style={{ marginBottom: '24px' }}>
                   <h3 style={{
                     color: '#F4A900',
@@ -1749,7 +2064,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
                     gap: isMobile ? '15px' : '20px'
                   }}>
                     {Object.entries(selectedVoter)
-                      .filter(([key]) => !['Name', 'Age', 'Gender', 'Relation Type', 'Relative Name', 'ID Code', 'S.No', 'Constituency', 'Part', 'Page', 'Position', 'House No', 'Division', 'Village', 'Ward', 'One Roof', 'One Roof Running Number'].includes(key))
+                      .filter(([key]) => !['NAME_EN', 'AGE', 'GENDER', 'R_TYPE', 'R_Name', 'EPIC', 'S.No', 'AC_NAME', 'BOOTH', 'SECTION', 'SL', 'HOUSE', 'SECTION_NAME', 'BOOTH NAME', 'BOOTH NAME TAMIL', 'One Roof', 'One Roof Running Number'].includes(key))
                       .map(([key, value]) => (
                         <div key={key} style={{
                           background: 'rgba(255,255,255,0.03)',
@@ -1964,35 +2279,35 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage }) => {
                         textDecoration: 'underline',
                         cursor: 'pointer'
                       }}
-                      onClick={() => handleElectoralIdClick(member["ID Code"])}
+                      onClick={() => handleElectoralIdClick(member["EPIC"])}
                     >
-                      {member["ID Code"]}
+                      {member["EPIC"]}
                     </div>
                     <div style={{ 
                       color: '#FFF8F0',
                       fontWeight: '600'
                     }}>
-                      {member["Name"]}
+                      {member["NAME_EN"]}
                     </div>
                     <div style={{ 
                       color: 'rgba(255,255,255,0.8)',
                       fontStyle: 'italic' 
                     }}>
-                      {member["Relation Type"]}
+                      {member["R_TYPE"]}
                     </div>
                     <div style={{ 
                       color: 'rgba(255,255,255,0.9)',
                       textAlign: 'center',
                       fontWeight: '600'
                     }}>
-                      {member["Age"]}
+                      {member["AGE"]}
                     </div>
                     <div style={{ 
-                      color: normalizeGender(member["Gender"]) === "ஆண்" ? '#87CEEB' : '#FFB6C1',
+                      color: normalizeGender(member["GENDER"]) === "ஆண்" ? '#87CEEB' : '#FFB6C1',
                       textAlign: 'center',
                       fontWeight: '600'
                     }}>
-                      {normalizeGender(member["Gender"]) === "ஆண்" ? "M" : "F"}
+                      {normalizeGender(member["GENDER"]) === "ஆண்" ? "M" : "F"}
                     </div>
                     <div>
                       <button 

@@ -27,18 +27,46 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
       return;
     }
 
-    // Check for admin credentials first
+    // Check for admin credentials first (Super Admin)
     if (formData.username === 'admin' && formData.password === 'admin123') {
       const adminUser = {
         id: 'admin',
         username: 'admin',
+        fullName: 'Super Administrator',
         email: 'admin@tvk.org.in',
-        role: 'administrator'
+        role: 'super_admin'
       };
-      
+
       setTimeout(() => {
         localStorage.setItem('currentUser', JSON.stringify(adminUser));
         onLogin(adminUser);
+        setLoading(false);
+      }, 1000);
+      return;
+    }
+
+    // Check for booth agent credentials
+    const boothAgents = JSON.parse(localStorage.getItem('boothAgents') || '[]');
+    const boothAgent = boothAgents.find(a =>
+      a.username === formData.username &&
+      a.password === formData.password &&
+      a.isActive
+    );
+
+    if (boothAgent) {
+      const agentUser = {
+        id: boothAgent.id,
+        username: boothAgent.username,
+        fullName: `Booth Agent - ${boothAgent.boothNumber}`,
+        email: '',
+        role: 'booth_agent',
+        boothNumber: boothAgent.boothNumber,
+        phoneNumber: boothAgent.phoneNumber
+      };
+
+      setTimeout(() => {
+        localStorage.setItem('currentUser', JSON.stringify(agentUser));
+        onLogin(agentUser);
         setLoading(false);
       }, 1000);
       return;

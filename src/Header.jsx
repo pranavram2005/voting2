@@ -24,6 +24,8 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
       homeNav: "🏠 முகப்பு",
       dashboardNav: "📊 களப்பலகை",
       votersNav: "👥 வாக்காளர் தரவு",
+      addBoothAgentNav: "👤 பூத் ஏஜெண்ட் சேர்க்கவும்",
+      confirmationsNav: "✅ வாக்கு உறுதிப்பாடு",
       welcome: "வரவேற்கிறோம்",
       settings: "அமைப்புகள்",
       logout: "வெளியேறு",
@@ -34,9 +36,11 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
       brandName: "TVK",
       brandTagline: "Tamilaga Vetri Kazhagam | EST. 2024",
       homeNav: "🏠 Home",
-      dashboardNav: "📊 Dashboard", 
+      dashboardNav: "📊 Dashboard",
       votersNav: "👥 Voter Data",
-      welcome: "Welcome", 
+      addBoothAgentNav: "👤 Add Booth Agent",
+      confirmationsNav: "✅ Vote Confirmations",
+      welcome: "Welcome",
       settings: "Settings",
       logout: "Logout",
       languageToggle: "🌐 தமிழ்",
@@ -137,24 +141,41 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
           <>
             {/* Navigation */}
             <nav style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <NavButton 
+              <NavButton
                 label={t.homeNav}
                 isActive={currentPage === 'home'}
                 onClick={() => onNavigate('home')}
                 isMobile={false}
               />
-              <NavButton 
+              <NavButton
                 label={t.dashboardNav}
                 isActive={currentPage === 'dashboard'}
                 onClick={() => onNavigate('dashboard')}
                 isMobile={false}
               />
-              <NavButton 
+              <NavButton
                 label={t.votersNav}
                 isActive={currentPage === 'voters'}
                 onClick={() => onNavigate('voters')}
                 isMobile={false}
               />
+              {/* Show Add Booth Agent only for super admin */}
+              {user && user.role === 'super_admin' && (
+                <>
+                  <NavButton
+                    label={t.addBoothAgentNav}
+                    isActive={currentPage === 'addBoothAgent'}
+                    onClick={() => onNavigate('addBoothAgent')}
+                    isMobile={false}
+                  />
+                  <NavButton
+                    label={t.confirmationsNav}
+                    isActive={currentPage === 'confirmations'}
+                    onClick={() => onNavigate('confirmations')}
+                    isMobile={false}
+                  />
+                </>
+              )}
             </nav>
 
             {/* User Info */}
@@ -294,7 +315,7 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
           gap: '12px'
         }}>
           {/* Navigation Links */}
-          <NavButton 
+          <NavButton
             label={t.homeNav}
             isActive={currentPage === 'home'}
             onClick={() => {
@@ -303,7 +324,7 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
             }}
             isMobile={true}
           />
-          <NavButton 
+          <NavButton
             label={t.dashboardNav}
             isActive={currentPage === 'dashboard'}
             onClick={() => {
@@ -312,7 +333,7 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
             }}
             isMobile={true}
           />
-          <NavButton 
+          <NavButton
             label={t.votersNav}
             isActive={currentPage === 'voters'}
             onClick={() => {
@@ -321,6 +342,29 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
             }}
             isMobile={true}
           />
+          {/* Show Add Booth Agent only for super admin */}
+          {user && user.role === 'super_admin' && (
+            <>
+              <NavButton
+                label={t.addBoothAgentNav}
+                isActive={currentPage === 'addBoothAgent'}
+                onClick={() => {
+                  onNavigate('addBoothAgent');
+                  setIsMenuOpen(false);
+                }}
+                isMobile={true}
+              />
+              <NavButton
+                label={t.confirmationsNav}
+                isActive={currentPage === 'confirmations'}
+                onClick={() => {
+                  onNavigate('confirmations');
+                  setIsMenuOpen(false);
+                }}
+                isMobile={true}
+              />
+            </>
+          )}
           
           {/* Language Toggle for Mobile */}
           <div style={{

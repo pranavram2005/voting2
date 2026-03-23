@@ -1,18 +1,24 @@
 import React, { useState, useEffect } from 'react';
 
+const getInitialFormState = () => ({
+  username: '',
+  boothNumber: '',
+  phoneNumber: '',
+  password: '',
+  confirmPassword: '',
+  youtubeLink: '',
+  websiteLink: '',
+  donationAmount: ''
+});
+
 const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
-  const [formData, setFormData] = useState({
-    username: '',
-    boothNumber: '',
-    phoneNumber: '',
-    password: '',
-    confirmPassword: ''
-  });
+  const [formData, setFormData] = useState(getInitialFormState);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [boothAgents, setBoothAgents] = useState([]);
   const [availableBooths, setAvailableBooths] = useState([]);
+  const [editingAgentId, setEditingAgentId] = useState(null);
 
   // Translation texts
   const translations = {
@@ -39,7 +45,23 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
       phone: "தொலைபேசி",
       created: "உருவாக்கப்பட்டது",
       active: "செயல்பாட்டில்",
-      status: "நிலை"
+      status: "நிலை",
+      youtubeLink: "YouTube இணைப்பு",
+      youtubeLinkPlaceholder: "YouTube இணைப்பை உள்ளிடவும் (விருப்பம்)",
+      websiteLink: "இணையதள இணைப்பு",
+      websiteLinkPlaceholder: "இணையதள URL (விருப்பம்)",
+      donationAmount: "நன்கொடை தொகை",
+      donationAmountPlaceholder: "தேவைப்பட்டால் நன்கொடை தொகை",
+      optional: "(விருப்பம்)",
+      edit: "திருத்து",
+      delete: "நீக்கு",
+      updateAgent: "பூத் ஏஜெண்ட் புதுப்பிக்கவும்",
+      updating: "புதுப்பிக்கிறது...",
+      agentUpdated: "பூத் ஏஜெண்ட் வெற்றிகரமாக புதுப்பிக்கப்பட்டது!",
+      agentDeleted: "பூத் ஏஜெண்ட் நீக்கப்பட்டது.",
+      editingMode: "நீங்கள் தற்போது ஒரு பூத் ஏஜெண்டை திருத்துகிறீர்கள்",
+      cancelEditing: "திருத்தலை ரத்து செய்",
+      deleteConfirm: "இந்த பூத் ஏஜெண்டை நீக்க விரும்புகிறீர்களா?"
     },
     english: {
       title: "Add New Booth Agent",
@@ -64,11 +86,36 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
       phone: "Phone",
       created: "Created",
       active: "Active",
-      status: "Status"
+      status: "Status",
+      youtubeLink: "YouTube Link",
+      youtubeLinkPlaceholder: "Paste YouTube video or channel URL (optional)",
+      websiteLink: "Website Link",
+      websiteLinkPlaceholder: "Enter website URL (optional)",
+      donationAmount: "Donation Amount",
+      donationAmountPlaceholder: "Enter donation amount, if any",
+      optional: "(Optional)",
+      edit: "Edit",
+      delete: "Delete",
+      updateAgent: "Update Booth Agent",
+      updating: "Updating...",
+      agentUpdated: "Booth Agent updated successfully!",
+      agentDeleted: "Booth Agent removed.",
+      editingMode: "You are editing an existing booth agent",
+      cancelEditing: "Cancel Editing",
+      deleteConfirm: "Are you sure you want to delete this booth agent?"
     }
   };
 
   const t = translations[languageMode];
+  const isEditing = Boolean(editingAgentId);
+  const isValidHttpUrl = (value) => {
+    try {
+      const url = new URL(value);
+      return url.protocol === 'http:' || url.protocol === 'https:';
+    } catch (err) {
+      return false;
+    }
+  };
 
   // Load existing booth agents on component mount
   useEffect(() => {
@@ -105,6 +152,60 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
     });
     setError('');
     setSuccess('');
+  };
+
+  const resetForm = () => {
+    setFormData(getInitialFormState());
+    setEditingAgentId(null);
+  };
+
+  const handleEdit = (agent) => {
+    setFormData({
+      username: agent.username || '',
+      boothNumber: agent.boothNumber || '',
+      phoneNumber: agent.phoneNumber || '',
+      password: agent.password || '',
+      confirmPassword: agent.password || '',
+      youtubeLink: agent.youtubeLink || '',
+      websiteLink: agent.websiteLink || '',
+      donationAmount:
+        agent.donationAmount !== null && agent.donationAmount !== undefined && agent.donationAmount !== ''
+          ? String(agent.donationAmount)
+          : ''
+    });
+    setEditingAgentId(agent.id);
+    setError('');
+    setSuccess('');
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleCancelEdit = () => {
+    resetForm();
+    setError('');
+    setSuccess('');
+    setLoading(false);
+  };
+
+  const handleDelete = (agentId) => {
+    const confirmDeletion = typeof window !== 'undefined' ? window.confirm(t.deleteConfirm) : true;
+
+    if (!confirmDeletion) {
+      return;
+    }
+
+    const existingAgents = JSON.parse(localStorage.getItem('boothAgents') || '[]');
+    const updatedAgents = existingAgents.filter(agent => agent.id !== agentId);
+    localStorage.setItem('boothAgents', JSON.stringify(updatedAgents));
+    setBoothAgents(updatedAgents);
+
+    if (editingAgentId === agentId) {
+      resetForm();
+    }
+
+    setError('');
+    setSuccess(t.agentDeleted);
   };
 
   const validateForm = () => {
@@ -144,21 +245,49 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
       return false;
     }
 
+    const trimmedUsername = formData.username.trim();
+    const trimmedBoothNumber = formData.boothNumber.trim();
+
     // Check if username already exists
     const existingUsers = JSON.parse(localStorage.getItem('users') || '[]');
     const existingBoothAgents = JSON.parse(localStorage.getItem('boothAgents') || '[]');
 
-    if (existingUsers.find(u => u.username === formData.username.trim()) ||
-        existingBoothAgents.find(a => a.username === formData.username.trim()) ||
-        formData.username.trim() === 'admin') {
+    const usernameConflictInUsers = existingUsers.some(u => u.username === trimmedUsername);
+    const usernameConflictInAgents = existingBoothAgents.some(
+      (agent) => agent.username === trimmedUsername && agent.id !== editingAgentId
+    );
+
+    if (usernameConflictInUsers || usernameConflictInAgents || trimmedUsername === 'admin') {
       setError('Username already exists');
       return false;
     }
 
     // Check if booth number already assigned
-    if (existingBoothAgents.find(a => a.boothNumber === formData.boothNumber.trim())) {
+    const boothNumberAlreadyTaken = existingBoothAgents.some(
+      (agent) => agent.boothNumber === trimmedBoothNumber && agent.id !== editingAgentId
+    );
+
+    if (boothNumberAlreadyTaken) {
       setError('Booth number already assigned to another agent');
       return false;
+    }
+
+    if (formData.youtubeLink.trim() && !isValidHttpUrl(formData.youtubeLink.trim())) {
+      setError('Please enter a valid YouTube link');
+      return false;
+    }
+
+    if (formData.websiteLink.trim() && !isValidHttpUrl(formData.websiteLink.trim())) {
+      setError('Please enter a valid website link');
+      return false;
+    }
+
+    if (formData.donationAmount.trim()) {
+      const amount = Number(formData.donationAmount);
+      if (Number.isNaN(amount) || amount < 0) {
+        setError('Donation amount must be a positive number');
+        return false;
+      }
     }
 
     return true;
@@ -173,6 +302,48 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
 
     setLoading(true);
 
+    const existingAgents = JSON.parse(localStorage.getItem('boothAgents') || '[]');
+
+    if (editingAgentId) {
+      const agentExists = existingAgents.some(agent => agent.id === editingAgentId);
+
+      if (!agentExists) {
+        setLoading(false);
+        setError('The selected booth agent could not be found.');
+        resetForm();
+        return;
+      }
+
+      const updatedAgents = existingAgents.map((agent) => {
+        if (agent.id !== editingAgentId) {
+          return agent;
+        }
+
+        return {
+          ...agent,
+          username: formData.username.trim(),
+          boothNumber: formData.boothNumber.trim(),
+          phoneNumber: formData.phoneNumber.trim(),
+          password: formData.password,
+          youtubeLink: formData.youtubeLink.trim() || null,
+          websiteLink: formData.websiteLink.trim() || null,
+          donationAmount: formData.donationAmount.trim() ? Number(formData.donationAmount) : null,
+          updatedAt: new Date().toISOString()
+        };
+      });
+
+      localStorage.setItem('boothAgents', JSON.stringify(updatedAgents));
+
+      setTimeout(() => {
+        setBoothAgents(updatedAgents);
+        setSuccess(t.agentUpdated);
+        resetForm();
+        setLoading(false);
+      }, 700);
+
+      return;
+    }
+
     // Create new booth agent
     const newAgent = {
       id: `agent_${Date.now()}`,
@@ -183,24 +354,20 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
       role: 'booth_agent',
       createdAt: new Date().toISOString(),
       createdBy: user.id,
-      isActive: true
+      isActive: true,
+      youtubeLink: formData.youtubeLink.trim() || null,
+      websiteLink: formData.websiteLink.trim() || null,
+      donationAmount: formData.donationAmount.trim() ? Number(formData.donationAmount) : null
     };
 
     // Save to localStorage
-    const existingAgents = JSON.parse(localStorage.getItem('boothAgents') || '[]');
     const updatedAgents = [...existingAgents, newAgent];
     localStorage.setItem('boothAgents', JSON.stringify(updatedAgents));
 
     setTimeout(() => {
       setBoothAgents(updatedAgents);
       setSuccess(t.agentCreated);
-      setFormData({
-        username: '',
-        boothNumber: '',
-        phoneNumber: '',
-        password: '',
-        confirmPassword: ''
-      });
+      resetForm();
       setLoading(false);
     }, 1000);
   };
@@ -287,6 +454,39 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
                   fontSize: '14px'
                 }}>
                   {success}
+                </div>
+              )}
+
+              {isEditing && (
+                <div style={{
+                  background: 'rgba(244,169,0,0.1)',
+                  border: '1px solid rgba(244,169,0,0.6)',
+                  borderRadius: '6px',
+                  padding: '12px',
+                  marginBottom: '16px',
+                  color: '#F4A900',
+                  fontSize: '13px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <span>{t.editingMode}</span>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    style={{
+                      background: 'transparent',
+                      color: '#F4A900',
+                      border: '1px solid rgba(244,169,0,0.8)',
+                      borderRadius: '4px',
+                      padding: '6px 12px',
+                      fontSize: '12px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {t.cancelEditing}
+                  </button>
                 </div>
               )}
 
@@ -459,6 +659,98 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
                 />
               </div>
 
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  color: '#F4A900',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  marginBottom: '6px'
+                }}>
+                  <span>{t.youtubeLink}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '400' }}>{t.optional}</span>
+                </label>
+                <input
+                  type="url"
+                  name="youtubeLink"
+                  value={formData.youtubeLink}
+                  onChange={handleChange}
+                  placeholder={t.youtubeLinkPlaceholder}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  color: '#F4A900',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  marginBottom: '6px'
+                }}>
+                  <span>{t.websiteLink}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '400' }}>{t.optional}</span>
+                </label>
+                <input
+                  type="url"
+                  name="websiteLink"
+                  value={formData.websiteLink}
+                  onChange={handleChange}
+                  placeholder={t.websiteLinkPlaceholder}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
+              <div style={{ marginBottom: '24px' }}>
+                <label style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  color: '#F4A900',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  marginBottom: '6px'
+                }}>
+                  <span>{t.donationAmount}</span>
+                  <span style={{ color: 'rgba(255,255,255,0.6)', fontWeight: '400' }}>{t.optional}</span>
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  name="donationAmount"
+                  value={formData.donationAmount}
+                  onChange={handleChange}
+                  placeholder={t.donationAmountPlaceholder}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    borderRadius: '6px',
+                    color: '#fff',
+                    fontSize: '14px'
+                  }}
+                />
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
@@ -475,8 +767,30 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
                   marginBottom: '16px'
                 }}
               >
-                {loading ? t.creating : t.createAgent}
+                {loading
+                  ? (isEditing ? t.updating : t.creating)
+                  : (isEditing ? t.updateAgent : t.createAgent)}
               </button>
+
+              {isEditing && (
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    background: 'transparent',
+                    color: '#F4A900',
+                    border: '1px dashed #F4A900',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    marginBottom: '16px'
+                  }}
+                >
+                  {t.cancelEditing}
+                </button>
+              )}
 
               <button
                 type="button"
@@ -575,6 +889,97 @@ const AddBoothAgent = ({ languageMode, user, onNavigate }) => {
                         <span style={{ color: 'rgba(255,255,255,0.6)' }}>{t.phone}: </span>
                         <span style={{ color: '#fff' }}>{agent.phoneNumber}</span>
                       </div>
+                    </div>
+
+                    {(agent.youtubeLink || agent.websiteLink || agent.donationAmount) && (
+                      <div style={{
+                        marginTop: '12px',
+                        display: 'grid',
+                        gridTemplateColumns: '1fr',
+                        gap: '6px',
+                        fontSize: '13px'
+                      }}>
+                        {agent.youtubeLink && (
+                          <div>
+                            <span style={{ color: 'rgba(255,255,255,0.6)' }}>{t.youtubeLink}: </span>
+                            <a
+                              href={agent.youtubeLink}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              style={{ color: '#9AD5FF' }}
+                            >
+                              {agent.youtubeLink}
+                            </a>
+                          </div>
+                        )}
+                        {agent.websiteLink && (
+                          <div>
+                            <span style={{ color: 'rgba(255,255,255,0.6)' }}>{t.websiteLink}: </span>
+                            <a
+                              href={agent.websiteLink}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                              style={{ color: '#9AD5FF' }}
+                            >
+                              {agent.websiteLink}
+                            </a>
+                          </div>
+                        )}
+                        {agent.donationAmount !== null && agent.donationAmount !== undefined && agent.donationAmount !== '' && (
+                          (() => {
+                            const numericDonation = Number(agent.donationAmount);
+                            const donationDisplay = Number.isFinite(numericDonation)
+                              ? numericDonation.toLocaleString()
+                              : agent.donationAmount;
+                            return (
+                              <div>
+                                <span style={{ color: 'rgba(255,255,255,0.6)' }}>{t.donationAmount}: </span>
+                                <span style={{ color: '#F4A900', fontWeight: '600' }}>
+                                  {donationDisplay}
+                                </span>
+                              </div>
+                            );
+                          })()
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{
+                      display: 'flex',
+                      gap: '8px',
+                      marginTop: '12px',
+                      flexWrap: 'wrap'
+                    }}>
+                      <button
+                        type="button"
+                        onClick={() => handleEdit(agent)}
+                        style={{
+                          padding: '8px 12px',
+                          background: 'rgba(255,255,255,0.08)',
+                          border: '1px solid rgba(255,255,255,0.2)',
+                          borderRadius: '4px',
+                          color: '#fff',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {t.edit}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(agent.id)}
+                        style={{
+                          padding: '8px 12px',
+                          background: 'rgba(200,16,46,0.15)',
+                          border: '1px solid rgba(200,16,46,0.4)',
+                          borderRadius: '4px',
+                          color: '#FF6B81',
+                          fontSize: '13px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {t.delete}
+                      </button>
                     </div>
 
                     <div style={{

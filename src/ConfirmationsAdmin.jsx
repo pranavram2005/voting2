@@ -8,6 +8,7 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
   const [checklists, setChecklists] = useState({});
   const [selectedAgent, setSelectedAgent] = useState(null);
   const [selectedVoterEpic, setSelectedVoterEpic] = useState(null);
+  const [boothAgents, setBoothAgents] = useState([]);
 
   const fieldLabels = {
     NAME_EN: "Voter Name",
@@ -66,6 +67,30 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
     };
   }, []);
 
+  useEffect(() => {
+    const loadAgents = () => {
+      try {
+        if (typeof window === "undefined") return;
+        const raw = localStorage.getItem("boothAgents");
+        const parsed = raw ? JSON.parse(raw) : [];
+        setBoothAgents(Array.isArray(parsed) ? parsed : []);
+      } catch (err) {
+        setBoothAgents([]);
+      }
+    };
+    loadAgents();
+
+    if (typeof window !== "undefined") {
+      window.addEventListener("storage", loadAgents);
+    }
+
+    return () => {
+      if (typeof window !== "undefined") {
+        window.removeEventListener("storage", loadAgents);
+      }
+    };
+  }, []);
+
   const epicToVoterMap = useMemo(() => {
     const map = {};
     allVoteData.forEach((voter) => {
@@ -109,6 +134,16 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
     return confirmedEntries.filter(([, info]) => (info && (info.confirmedBy || "Unknown")) === selectedAgent);
   }, [confirmedEntries, selectedAgent]);
 
+  const agentInfoMap = useMemo(() => {
+    const map = {};
+    boothAgents.forEach((agent) => {
+      if (agent && agent.username) {
+        map[agent.username] = agent;
+      }
+    });
+    return map;
+  }, [boothAgents]);
+
   const selectedVoter = useMemo(() => {
     if (!selectedVoterEpic) return null;
     return epicToVoterMap[selectedVoterEpic] || null;
@@ -118,6 +153,11 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
     if (!selectedVoterEpic) return null;
     return checklists[selectedVoterEpic] || null;
   }, [selectedVoterEpic, checklists]);
+  
+  const selectedAgentInfo = useMemo(() => {
+    if (!selectedAgent) return null;
+    return agentInfoMap[selectedAgent] || null;
+  }, [selectedAgent, agentInfoMap]);
 
   if (!user || user.role !== "super_admin") {
     return (
@@ -247,7 +287,11 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
                       }}
                     >
                       <th style={{ padding: "8px", textAlign: "left" }}>Agent</th>
-                      <th style={{ padding: "8px", textAlign: "left" }}>Booth(s)</th>
+                      <th style={{ padding: "8px", textAlign: "left" }}>Assigned Booth</th>
+                      <th style={{ padding: "8px", textAlign: "left" }}>Phone</th>
+                      <th style={{ padding: "8px", textAlign: "left" }}>Links</th>
+                      <th style={{ padding: "8px", textAlign: "left" }}>Booth(s) Confirmed</th>
+                      <th style={{ padding: "8px", textAlign: "left" }}>Donation</th>
                       <th style={{ padding: "8px", textAlign: "right" }}>
                         Confirmed Votes
                       </th>
@@ -256,6 +300,16 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
                   <tbody>
                     {Object.entries(perAgent).map(([agent, info]) => {
                       const boothList = Array.from(info.boothNumbers || []).join(", ") || "-";
+                      const agentDetails = agentInfoMap[agent] || {};
+                      const primaryBooth = agentDetails.boothNumber || boothList;
+                      const phoneNumber = agentDetails.phoneNumber || "-";
+                      const donationValue = Number(agentDetails.donationAmount);
+                      const donationDisplay =
+                        agentDetails.donationAmount !== null && agentDetails.donationAmount !== undefined && agentDetails.donationAmount !== ""
+                          ? (Number.isFinite(donationValue)
+                              ? `Rs ${donationValue.toLocaleString()}`
+                              : agentDetails.donationAmount)
+                          : "-";
                       return (
                         <tr
                           key={agent}
@@ -269,7 +323,47 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
                           }}
                         >
                           <td style={{ padding: "8px" }}>{agent}</td>
+                          <td style={{ padding: "8px" }}>{primaryBooth || "-"}</td>
+                          <td style={{ padding: "8px" }}>{phoneNumber}</td>
+                          <td style={{ padding: "8px" }}>
+                            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                              {agentDetails.youtubeLink && (
+                                <a
+                                  href={agentDetails.youtubeLink}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  style={{
+                                    color: "#9AD5FF",
+                                    fontSize: 12,
+                                    textDecoration: "underline",
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  YouTube
+                                </a>
+                              )}
+                              {agentDetails.websiteLink && (
+                                <a
+                                  href={agentDetails.websiteLink}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  style={{
+                                    color: "#9AD5FF",
+                                    fontSize: 12,
+                                    textDecoration: "underline",
+                                  }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  Website
+                                </a>
+                              )}
+                              {!agentDetails.youtubeLink && !agentDetails.websiteLink && (
+                                <span style={{ fontSize: 12, color: "rgba(255,255,255,0.6)" }}>-</span>
+                              )}
+                            </div>
+                          </td>
                           <td style={{ padding: "8px" }}>{boothList}</td>
+                          <td style={{ padding: "8px" }}>{donationDisplay}</td>
                           <td style={{ padding: "8px", textAlign: "right" }}>
                             {info.count.toLocaleString()}
                           </td>
@@ -324,6 +418,88 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
             </h1>
             <div style={{ width: 100 }} />
           </div>
+
+          {selectedAgentInfo && (
+            <div
+              style={{
+                marginBottom: "16px",
+                padding: "16px",
+                borderRadius: "12px",
+                border: "1px solid rgba(255,255,255,0.15)",
+                background: "rgba(255,255,255,0.03)",
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr" : "repeat(3, minmax(0, 1fr))",
+                gap: "12px",
+              }}
+            >
+              <div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1 }}>Assigned Booth</div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  {selectedAgentInfo.boothNumber || "-"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1 }}>Phone</div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  {selectedAgentInfo.phoneNumber || "-"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1 }}>Status</div>
+                <div style={{ fontSize: 16, fontWeight: 600, color: selectedAgentInfo.isActive ? "#2ECC71" : "#FFC107" }}>
+                  {selectedAgentInfo.isActive ? "Active" : "Inactive"}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1 }}>Donation</div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  {(() => {
+                    const donationValue = Number(selectedAgentInfo.donationAmount);
+                    if (selectedAgentInfo.donationAmount === null || selectedAgentInfo.donationAmount === undefined || selectedAgentInfo.donationAmount === "") {
+                      return "-";
+                    }
+                    return Number.isFinite(donationValue)
+                      ? `Rs ${donationValue.toLocaleString()}`
+                      : selectedAgentInfo.donationAmount;
+                  })()}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1 }}>Created At</div>
+                <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  {selectedAgentInfo.createdAt ? new Date(selectedAgentInfo.createdAt).toLocaleDateString() : "-"}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                <div style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", textTransform: "uppercase", letterSpacing: 1 }}>Links</div>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  {selectedAgentInfo.youtubeLink && (
+                    <a
+                      href={selectedAgentInfo.youtubeLink}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      style={{ color: "#9AD5FF", fontSize: 13, textDecoration: "underline" }}
+                    >
+                      YouTube
+                    </a>
+                  )}
+                  {selectedAgentInfo.websiteLink && (
+                    <a
+                      href={selectedAgentInfo.websiteLink}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      style={{ color: "#9AD5FF", fontSize: 13, textDecoration: "underline" }}
+                    >
+                      Website
+                    </a>
+                  )}
+                  {!selectedAgentInfo.youtubeLink && !selectedAgentInfo.websiteLink && (
+                    <span style={{ fontSize: 13, color: "rgba(255,255,255,0.6)" }}>-</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           <div
             style={{
@@ -392,6 +568,7 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
                       <th style={{ padding: "8px", textAlign: "left" }}>Booth</th>
                       <th style={{ padding: "8px", textAlign: "left" }}>Street</th>
                       <th style={{ padding: "8px", textAlign: "left" }}>Needs</th>
+                      <th style={{ padding: "8px", textAlign: "left" }}>Party</th>
                       <th style={{ padding: "8px", textAlign: "left" }}>Phone</th>
                       <th style={{ padding: "8px", textAlign: "left" }}>Confirmed At</th>
                     </tr>
@@ -417,6 +594,7 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
                           <td style={{ padding: "8px" }}>{voter["BOOTH"] || ""}</td>
                           <td style={{ padding: "8px" }}>{voter["SECTION_NAME"] || ""}</td>
                           <td style={{ padding: "8px", maxWidth: 260 }}>{needsValue}</td>
+                          <td style={{ padding: "8px" }}>{info.votedParty || "-"}</td>
                           <td style={{ padding: "8px" }}>{info.phone || "-"}</td>
                           <td style={{ padding: "8px" }}>
                             {info.confirmedAt
@@ -698,6 +876,9 @@ const ConfirmationsAdmin = ({ user, languageMode }) => {
                       {selectedChecklist.needs === "Others"
                         ? (selectedChecklist.needsOther || "Others")
                         : (selectedChecklist.needs || "-")}
+                    </div>
+                    <div style={{ marginBottom: 4 }}>
+                      <strong>Party:</strong> {selectedChecklist.votedParty || "-"}
                     </div>
                     <div style={{ marginBottom: 4 }}>
                       <strong>Phone:</strong> {selectedChecklist.phone || "-"}

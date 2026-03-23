@@ -188,6 +188,19 @@ if (typeof document !== 'undefined') {
 // Combine all voting data into one array (from JSON)
 const allVoteData = data;
 
+const PARTY_OPTIONS = [
+  "DMK",
+  "AIADMK",
+  "BJP",
+  "INC",
+  "PMK",
+  "DMDK",
+  "NTK",
+  "AMMK",
+  "Independent",
+  "Others"
+];
+
 const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
   const tableRef = useRef(null);
@@ -214,8 +227,11 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
     needsOther: "",
     phone: "",
     confirmed: false,
+    votedParty: "",
   });
   const [checklistSavedMessage, setChecklistSavedMessage] = useState("");
+  const [checklistMap, setChecklistMap] = useState({});
+  const [hoveredRowIndex, setHoveredRowIndex] = useState(null);
   
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -264,66 +280,90 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
     setSuggestions({ names, pdfNos });
   }, [user]); // Add user as dependency
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const loadChecklists = () => {
+      try {
+        const stored = localStorage.getItem("voterChecklists");
+        setChecklistMap(stored ? JSON.parse(stored) : {});
+      } catch (err) {
+        setChecklistMap({});
+      }
+    };
+
+    loadChecklists();
+    window.addEventListener("storage", loadChecklists);
+
+    return () => {
+      window.removeEventListener("storage", loadChecklists);
+    };
+  }, []);
+
   // Load checklist info whenever a voter is selected
   useEffect(() => {
     if (!selectedVoter || !selectedVoter["EPIC"]) {
-      setVoterChecklist({ needs: "", phone: "", confirmed: false });
+      setVoterChecklist({ needs: "", needsOther: "", phone: "", confirmed: false, votedParty: "" });
       setChecklistSavedMessage("");
       return;
     }
-    try {
-      const epic = String(selectedVoter["EPIC"]);
-      const stored = typeof window !== "undefined" ? localStorage.getItem("voterChecklists") : null;
-      const all = stored ? JSON.parse(stored) : {};
-      const existing = all[epic] || {};
-      setVoterChecklist({
-        needs: existing.needs || "",
-        needsOther: existing.needsOther || "",
-        phone: existing.phone || "",
-        confirmed: !!existing.confirmed,
-      });
-      setChecklistSavedMessage("");
-    } catch (e) {
-      // Fallback to empty if parsing fails
-      setVoterChecklist({ needs: "", needsOther: "", phone: "", confirmed: false });
-      setChecklistSavedMessage("");
-    }
-  }, [selectedVoter]);
+
+    const epic = String(selectedVoter["EPIC"]);
+    const existing = checklistMap[epic] || {};
+    setVoterChecklist({
+      needs: existing.needs || "",
+      needsOther: existing.needsOther || "",
+      phone: existing.phone || "",
+      confirmed: !!existing.confirmed,
+      votedParty: existing.votedParty || "",
+    });
+    setChecklistSavedMessage("");
+  }, [selectedVoter, checklistMap]);
 
   const columns = useMemo(() => {
     if (data.length === 0) return [];
     // Define the order of columns (One Roof fields moved to the right, IS_DELETED removed)
     const orderedColumns = [
       "S.No",
-      "AC_NAME",
       "SECTION",
-      "SECTION_NAME",
       "BOOTH",
-      "SL",
       "EPIC",
       "HOUSE",
       "NAME_T",
-      "NAME_EN",
-      "R_TYPE",
-      "R_Name",
-      "REL_EN",
       "AGE",
       "GENDER",
-      "DOB",
       "MOBILE",
-      "BOOTH NAME",
-      "BOOTH NAME TAMIL",
       "One Roof",
       "One Roof Running Number"
     ];
 
-    const availableColumns = Object.keys(data[0]).filter(col => !["Photo"].includes(col));
+    const columnsToExclude = new Set([
+      "Photo",
+      "SECTION_NAME",
+      "AC_NAME",
+      "SL",
+      "R_TYPE",
+      "R_Name",
+      "REL_EN",
+      "DOB",
+      "BOOTH NAME",
+      "BOOTH NAME TAMIL",
+      "IS_DELETED"
+    ]);
+
+    const availableColumns = Object.keys(data[0]).filter(col => !columnsToExclude.has(col));
     
     // Return columns in the specified order, then any additional columns
     const result = orderedColumns.filter(col => availableColumns.includes(col));
     const additional = availableColumns.filter(col => !orderedColumns.includes(col));
     
-    return [...result, ...additional];
+    return [
+      ...result,
+      ...additional,
+      "SUPPORTED_PARTY"
+    ];
   }, [data]);
 
   const normalizeRelationType = (relationType) => {
@@ -442,7 +482,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
         // House No filter (exact match) using HOUSE
         (filters.houseNo === "" || String(item["HOUSE"]).toLowerCase() === filters.houseNo.toLowerCase()) &&
         // Serial No filter (exact match)
-        (filters.serialNo === "" || String(item["S.No"]) === filters.serialNo) &&
+        (filters.serialNo === "" || String(item["S.No"]) === String(Number(filters.serialNo) - 1)) &&
         // Name filter (text search) using English name
         (filters.name === "" || String(item["NAME_EN"]).toLowerCase().includes(filters.name.toLowerCase())) &&
         // Relation filter (with normalization) using R_TYPE
@@ -548,6 +588,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
         needsOther: voterChecklist.needsOther || "",
         phone: voterChecklist.phone || "",
         confirmed: !!voterChecklist.confirmed,
+        votedParty: voterChecklist.votedParty || "",
         confirmedBy: user && user.username ? user.username : (user && user.fullName) || "Unknown",
         confirmedAt: new Date().toISOString(),
         boothNumber: user && user.boothNumber ? user.boothNumber : null,
@@ -556,6 +597,7 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
       if (typeof window !== "undefined") {
         localStorage.setItem("voterChecklists", JSON.stringify(all));
       }
+      setChecklistMap(all);
       setChecklistSavedMessage("Saved successfully");
     } catch (e) {
       setChecklistSavedMessage("Could not save, please try again");
@@ -657,14 +699,14 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
       voters: "voters",
       from: "from",
       totalRecords: "total records",
-      advancedSearch: "🔍 Advanced Search Filters",
-      locationFilters: "📍 Location Filters",
+      advancedSearch: " Advanced Search Filters",
+      locationFilters: " Location Filters",
       constituency: "Constituency",
       selectConstituency: "Select Constituency",
       booth: "Booth (Part) - Multiple Selection",
-      ward: "Ward - Multiple Selection", 
+      ward: "Section - Multiple Selection", 
       village: "Street - Multiple Selection",
-      personalFilters: "👤 Personal Filters",
+      personalFilters: "Personal Filters",
       voterIdSearch: "Voter ID Search",
       houseNumber: "House Number",
       serialNumber: "Serial Number",
@@ -1459,35 +1501,97 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
               </tr>
             </thead>
             <tbody>
-              {paginatedData.map((row, index) => (
-                <tr 
-                  key={row.id || index} 
-                  onClick={() => handleRowClick(row, index)}
-                  style={{
-                    borderBottom: '1px solid rgba(255,255,255,0.08)',
-                    cursor: 'pointer',
-                    transition: 'background 0.2s',
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'} 
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
-                >
-                  {columns.map(header => (
-                    <td 
-                      key={header} 
-                      style={{
-                        ...tvkTableCellStyle,
-                        padding: isMobile ? '10px 8px' : '12px 15px',
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        maxWidth: '200px'
-                      }}
-                    >
-                      {row[header]}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {paginatedData.map((row, index) => {
+                const rowEpic = row && row["EPIC"] ? String(row["EPIC"]) : null;
+                const rowChecklist = rowEpic ? checklistMap[rowEpic] : null;
+                const rowConfirmed = Boolean(rowChecklist && rowChecklist.confirmed);
+                const agentLabel = rowChecklist && rowChecklist.confirmedBy ? `Confirmed by ${rowChecklist.confirmedBy}` : 'Confirmed';
+                const baseBackground = rowConfirmed ? 'rgba(46,204,113,0.18)' : 'transparent';
+                const hoverBackground = rowConfirmed ? 'rgba(46,204,113,0.32)' : 'rgba(255,255,255,0.05)';
+
+                return (
+                  <tr 
+                    key={row.id || index} 
+                    onClick={() => handleRowClick(row, index)}
+                    style={{
+                      borderBottom: '1px solid rgba(255,255,255,0.08)',
+                      cursor: 'pointer',
+                      transition: 'background 0.2s',
+                      background: baseBackground,
+                    }}
+                    onMouseEnter={(e) => {
+                      setHoveredRowIndex(index);
+                      e.currentTarget.style.background = hoverBackground;
+                    }} 
+                    onMouseLeave={(e) => {
+                      setHoveredRowIndex((prev) => (prev === index ? null : prev));
+                      e.currentTarget.style.background = baseBackground;
+                    }}
+                    title={rowConfirmed ? agentLabel : undefined}
+                  >
+                    {columns.map((header, colIndex) => (
+                      (() => {
+                        if (header === "SUPPORTED_PARTY") {
+                          const partyLabel = rowChecklist && rowChecklist.votedParty ? rowChecklist.votedParty : "-";
+                          return (
+                            <td
+                              key={header}
+                              style={{
+                                ...tvkTableCellStyle,
+                                padding: isMobile ? '10px 8px' : '12px 15px',
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                maxWidth: '200px',
+                                fontWeight: rowChecklist && rowChecklist.votedParty ? 600 : 'normal',
+                                color: rowChecklist && rowChecklist.votedParty ? '#F4A900' : 'rgba(255,255,255,0.75)'
+                              }}
+                            >
+                              {partyLabel}
+                            </td>
+                          );
+                        }
+
+                        return (
+                      <td 
+                        key={header} 
+                        style={{
+                          ...tvkTableCellStyle,
+                          padding: isMobile ? '10px 8px' : '12px 15px',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          maxWidth: '200px',
+                          position: rowConfirmed && colIndex === 0 ? 'relative' : undefined
+                        }}
+                      >
+                        {row[header]}
+                        {rowConfirmed && colIndex === 0 && hoveredRowIndex === index && (
+                          <span
+                            style={{
+                              position: 'absolute',
+                              top: '6px',
+                              right: isMobile ? '4px' : '12px',
+                              background: 'rgba(46,204,113,0.95)',
+                              color: '#041c10',
+                              borderRadius: '999px',
+                              padding: '2px 10px',
+                              fontSize: '10px',
+                              fontWeight: 600,
+                              letterSpacing: '0.5px',
+                              boxShadow: '0 4px 10px rgba(46,204,113,0.35)'
+                            }}
+                          >
+                            {agentLabel}
+                          </span>
+                        )}
+                        </td>
+                        );
+                      })()
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1832,6 +1936,24 @@ const SimpleJsonViewer = ({ languageMode, onToggleLanguage, user }) => {
                           }}
                         />
                       )}
+                      <label style={{
+                        display: 'block',
+                        margin: '16px 0 6px',
+                        fontSize: '12px',
+                        color: 'rgba(255,255,255,0.7)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '1px'
+                      }}>Voted Party</label>
+                      <select
+                        value={voterChecklist.votedParty}
+                        onChange={(e) => handleChecklistFieldChange('votedParty', e.target.value)}
+                        style={tvkSelectStyle}
+                      >
+                        <option value="">Select Party</option>
+                        {PARTY_OPTIONS.map((party) => (
+                          <option key={party} value={party}>{party}</option>
+                        ))}
+                      </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                       <div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-// import tvkImage from './assets/i_TVK.png'; // uncomment in your project
+import tvkImage from './assets/TVK2.png'; 
 
 const Login = ({ onLogin, onSwitchToRegister }) => {
   const [formData, setFormData] = useState({ username: '', password: '' });
@@ -585,7 +585,7 @@ const Login = ({ onLogin, onSwitchToRegister }) => {
           <div className="tvk-image-wrap">
             {/* Replace src below with your actual tvkImage import */}
             <img
-              src="src\assets\TVK2.png"
+              src={tvkImage}
               alt="TVK Org Chart"
             />
           </div>

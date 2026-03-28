@@ -20,11 +20,13 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
   const translations = {
     tamil: {
       brandName: "TVK",
-      brandTagline: "தமிழக வெற்றி கழகம் | EST. 2024",
+      brandTagline: "தமிழக வெற்றி கழகம்",
       homeNav: "🏠 முகப்பு",
       dashboardNav: "📊 களப்பலகை",
       votersNav: "👥 வாக்காளர் தரவு",
       addBoothAgentNav: "👤 பூத் ஏஜெண்ட் சேர்க்கவும்",
+      addWardAgentNav: "🏷️ வார்டு ஏஜெண்ட் சேர்க்கவும்",
+      addZonalAgentNav: "🧭 மண்டல ஏஜெண்ட் சேர்க்கவும்",
       confirmationsNav: "✅ வாக்கு உறுதிப்பாடு",
       welcome: "வரவேற்கிறோம்",
       settings: "அமைப்புகள்",
@@ -34,11 +36,13 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
     },
     english: {
       brandName: "TVK",
-      brandTagline: "Tamilaga Vetri Kazhagam | EST. 2024",
+      brandTagline: "Tamilaga Vetri Kazhagam",
       homeNav: "🏠 Home",
       dashboardNav: "📊 Dashboard",
       votersNav: "👥 Voter Data",
       addBoothAgentNav: "👤 Add Booth Agent",
+      addWardAgentNav: "🏷️ Add Ward Agent",
+      addZonalAgentNav: "🧭 Add Zonal Agent",
       confirmationsNav: "✅ Vote Confirmations",
       welcome: "Welcome",
       settings: "Settings",
@@ -59,13 +63,84 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
       zIndex: 100,
       boxShadow: '0 4px 30px rgba(200,16,46,0.4)'
     }}>
+      {/* Top Bar: Confidential left, user/language right */}
       <div style={{
+        width: '100%',
+        background: 'rgba(200,16,46,0.4)',
+        color: '#fff',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: isMobile ? '12px 16px' : '16px 40px',
-        flexWrap: isMobile ? 'wrap' : 'nowrap'
+        fontSize: isMobile ? '11px' : '14px',
+        fontWeight: 500,
+        padding: isMobile ? '6px 8px' : '7px 40px 7px 24px',
+        letterSpacing: '1px',
+        borderBottom: '2px solid #F4A900',
+        boxShadow: '0 2px 8px rgba(20,58,33,0.08)'
       }}>
+        <div style={{ color: '#F4A900', fontWeight: 700, letterSpacing: '1.2px', fontSize: isMobile ? '10px' : '12px' }}>
+          CONFIDENTIAL · SAIDAPET AC 23 · TVK 2026 · FIELD INTELLIGENCE
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '18px' }}>
+          {/* Language Toggle - pill style */}
+          <div
+            onClick={onToggleLanguage}
+            style={{
+              background: '#fff',
+              borderRadius: '18px',
+              border: '2px solid #F4A900',
+              display: 'flex',
+              alignItems: 'center',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '13px',
+              overflow: 'hidden',
+              boxShadow: '0 2px 8px rgba(244,169,0,0.08)',
+              height: '32px',
+            }}
+          >
+            <span style={{
+              background: languageMode === 'tamil' ? '#F4A900' : 'transparent',
+              color: languageMode === 'tamil' ? '#143821' : '#143821',
+              padding: '6px 18px',
+              transition: 'background 0.2s',
+              fontWeight: languageMode === 'tamil' ? 800 : 600,
+              borderRight: '1.5px solid #F4A900',
+              letterSpacing: '1px',
+            }}>த</span>
+            <span style={{
+              background: languageMode === 'english' ? '#F4A900' : 'transparent',
+              color: languageMode === 'english' ? '#143821' : '#143821',
+              padding: '6px 18px',
+              transition: 'background 0.2s',
+              fontWeight: languageMode === 'english' ? 800 : 600,
+              letterSpacing: '1px',
+            }}>EN</span>
+          </div>
+          {/* User Avatar */}
+          {user && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ width: '32px', height: '32px', background: 'linear-gradient(135deg, #F4A900, #143821)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#143821', fontWeight: 'bold', fontSize: '15px', border: '2px solid #F4A900' }}>
+                {(user.fullName || user.username || 'S').charAt(0).toUpperCase()}
+              </div>
+              <div style={{ color: '#fff', fontSize: '13px', fontWeight: 600 }}>Welcome Super Administrator</div>
+              <span style={{ color: 'rgba(255,255,255,0.4)' }}>|</span>
+              <span onClick={onLogout} style={{ cursor: 'pointer', marginLeft: '8px', color: '#F4A900', fontWeight: 700 }}>{t.logout}</span>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Main Navbar/Logo Section */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: isMobile ? 'column' : 'row',
+          alignItems: isMobile ? 'stretch' : 'center',
+          justifyContent: 'space-between',
+          padding: isMobile ? '8px 6px' : '16px 40px',
+          gap: isMobile ? '8px' : '0',
+        }}
+      >
         {/* Logo Section */}
         <div style={{
           display: 'flex',
@@ -74,16 +149,16 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
           minWidth: 'fit-content'
         }}>
           <div style={{
-            width: isMobile ? '50px' : '70px',
-            height: isMobile ? '50px' : '70px',
+            width: isMobile ? '32px' : '40px',
+            height: isMobile ? '32px' : '40px',
             background: 'radial-gradient(circle, #F4A900 0%, #C8860A 100%)',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: isMobile ? '20px' : '30px',
-            boxShadow: '0 0 20px rgba(244,169,0,0.5)',
-            border: '3px solid rgba(255,255,255,0.2)',
+            fontSize: isMobile ? '14px' : '18px',
+            boxShadow: '0 0 12px rgba(244,169,0,0.4)',
+            border: '2px solid rgba(255,255,255,0.18)',
             position: 'relative',
             animation: 'pulse-glow 3s ease-in-out infinite'
           }}>
@@ -91,8 +166,8 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
           </div>
           <div>
             <h1 style={{
-              fontSize: isMobile ? '24px' : '36px',
-              letterSpacing: isMobile ? '2px' : '4px',
+              fontSize: isMobile ? '15px' : '20px',
+              letterSpacing: isMobile ? '1.2px' : '2px',
               color: '#F4A900',
               lineHeight: '1',
               fontWeight: 'bold',
@@ -102,9 +177,9 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
               {t.brandName}
             </h1>
             <p style={{
-              fontSize: isMobile ? '9px' : '11px',
+              fontSize: isMobile ? '7px' : '9px',
               color: 'rgba(255,255,255,0.7)',
-              letterSpacing: isMobile ? '1px' : '2px',
+              letterSpacing: isMobile ? '0.5px' : '1px',
               marginTop: '2px',
               margin: 0,
               display: isMobile ? 'none' : 'block' // Hide tagline on very small screens
@@ -113,6 +188,72 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
             </p>
           </div>
         </div>
+
+        {/* Main Navigation Bar: Only show on desktop/tablet, hide on mobile */}
+        {!isMobile && (
+          <nav
+            style={{
+              display: 'flex',
+              gap: '8px',
+              alignItems: 'center',
+              fontSize: '8px',
+              overflowX: 'visible',
+              width: 'auto',
+              paddingBottom: 0,
+              WebkitOverflowScrolling: 'touch',
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+            }}
+          >
+            <NavButton
+              label={t.homeNav}
+              isActive={currentPage === 'home'}
+              onClick={() => onNavigate('home')}
+              isMobile={false}
+            />
+            <NavButton
+              label={t.dashboardNav}
+              isActive={currentPage === 'dashboard'}
+              onClick={() => onNavigate('dashboard')}
+              isMobile={false}
+            />
+            <NavButton
+              label={t.votersNav}
+              isActive={currentPage === 'voters'}
+              onClick={() => onNavigate('voters')}
+              isMobile={false}
+            />
+            {/* Show Add Booth Agent only for super admin */}
+            {user && user.role === 'super_admin' && (
+              <>
+                <NavButton
+                  label={t.addBoothAgentNav}
+                  isActive={currentPage === 'addBoothAgent'}
+                  onClick={() => onNavigate('addBoothAgent')}
+                  isMobile={false}
+                />
+                <NavButton
+                  label={t.addWardAgentNav}
+                  isActive={currentPage === 'addWardAgent'}
+                  onClick={() => onNavigate('addWardAgent')}
+                  isMobile={false}
+                />
+                <NavButton
+                  label={t.addZonalAgentNav}
+                  isActive={currentPage === 'addZonalAgent'}
+                  onClick={() => onNavigate('addZonalAgent')}
+                  isMobile={false}
+                />
+                <NavButton
+                  label={t.confirmationsNav}
+                  isActive={currentPage === 'confirmations'}
+                  onClick={() => onNavigate('confirmations')}
+                  isMobile={false}
+                />
+              </>
+            )}
+          </nav>
+        )}
 
         {/* Mobile Menu Button */}
         {isMobile && (
@@ -136,172 +277,6 @@ const Header = ({ user, currentPage, onNavigate, onLogout, languageMode, onToggl
           </button>
         )}
 
-        {/* Desktop Navigation & User Info */}
-        {!isMobile && (
-          <>
-            {/* Navigation */}
-            <nav style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <NavButton
-                label={t.homeNav}
-                isActive={currentPage === 'home'}
-                onClick={() => onNavigate('home')}
-                isMobile={false}
-              />
-              <NavButton
-                label={t.dashboardNav}
-                isActive={currentPage === 'dashboard'}
-                onClick={() => onNavigate('dashboard')}
-                isMobile={false}
-              />
-              <NavButton
-                label={t.votersNav}
-                isActive={currentPage === 'voters'}
-                onClick={() => onNavigate('voters')}
-                isMobile={false}
-              />
-              {/* Show Add Booth Agent only for super admin */}
-              {user && user.role === 'super_admin' && (
-                <>
-                  <NavButton
-                    label={t.addBoothAgentNav}
-                    isActive={currentPage === 'addBoothAgent'}
-                    onClick={() => onNavigate('addBoothAgent')}
-                    isMobile={false}
-                  />
-                  <NavButton
-                    label={t.confirmationsNav}
-                    isActive={currentPage === 'confirmations'}
-                    onClick={() => onNavigate('confirmations')}
-                    isMobile={false}
-                  />
-                </>
-              )}
-            </nav>
-
-            {/* User Info */}
-            {user && (
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px'
-              }}>
-                {/* Language Toggle Switch */}
-                <div
-                  onClick={onToggleLanguage}
-                  style={{
-                    width: '80px',
-                    height: '36px',
-                    background: languageMode === 'tamil' ? '#C8102E' : '#F4A900',
-                    borderRadius: '18px',
-                    position: 'relative',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    border: '2px solid #000',
-                    boxShadow: '0 3px 8px rgba(0,0,0,0.3)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    padding: '0 8px'
-                  }}
-                  onMouseEnter={(e) => {
-                    e.target.style.transform = 'translateY(-1px)';
-                    e.target.style.boxShadow = '0 4px 12px rgba(0,0,0,0.4)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.target.style.transform = 'translateY(0)';
-                    e.target.style.boxShadow = '0 3px 8px rgba(0,0,0,0.3)';
-                  }}
-                >
-                  <span style={{
-                    fontSize: '12px',
-                    fontWeight: 'bold',
-                    color: '#000',
-                    transition: 'color 0.3s',
-                    zIndex: 2,
-                    position: 'absolute',
-                    left: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    lineHeight: '1'
-                  }}>த</span>
-
-                  <div style={{
-                    width: '28px',
-                    height: '28px',
-                    background: '#fff',
-                    borderRadius: '50%',
-                    position: 'absolute',
-                    left: languageMode === 'tamil' ? '4px' : '48px',
-                    transition: 'left 0.3s ease',
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    border: '1px solid rgba(0,0,0,0.1)'
-                  }} />
-
-                  <span style={{
-                    fontSize: '11px',
-                    fontWeight: 'bold',
-                    color: languageMode === 'english' ? '#000' : 'rgba(255,255,255,0.4)',
-                    transition: 'color 0.3s',
-                    zIndex: 2,
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    lineHeight: '1'
-                  }}>EN</span>
-                </div>
-
-                <div style={{
-                  width: '40px',
-                  height: '40px',
-                  background: 'linear-gradient(135deg, #C8102E, #A00020)',
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#fff',
-                  fontWeight: 'bold',
-                  fontSize: '16px'
-                }}>
-                  {(user.fullName || user.username || 'U').charAt(0).toUpperCase()}
-                </div>
-                <div>
-                  <div style={{
-                    color: '#fff',
-                    fontSize: '14px',
-                    fontWeight: '600'
-                  }}>
-                    {t.welcome} {user.fullName || user.username}
-                  </div>
-                  <div style={{
-                    fontSize: '12px',
-                    color: 'rgba(255,255,255,0.6)'
-                  }}>
-                    <span style={{ cursor: 'pointer', marginRight: '8px' }}>{t.settings}</span>
-                    <span style={{ color: 'rgba(255,255,255,0.4)' }}>|</span>
-                    <span 
-                      onClick={onLogout}
-                      style={{ 
-                        cursor: 'pointer', 
-                        marginLeft: '8px',
-                        color: '#F4A900',
-                        transition: 'color 0.3s'
-                      }}
-                    >
-                      {t.logout}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </>
-        )}
       </div>
 
       {/* Mobile Menu */}
@@ -482,40 +457,53 @@ function NavButton({ label, isActive, onClick, isMobile }) {
     <button
       onClick={onClick}
       style={{
-        color: isActive ? '#fff' : 'rgba(255,255,255,0.85)',
+        color: 'rgba(255,255,255,0.85)',
         textDecoration: 'none',
-        padding: isMobile ? '12px 16px' : '8px 16px',
+        padding: isMobile ? '12px 16px' : '3px 12px',
         borderRadius: '4px',
-        fontSize: isMobile ? '16px' : '13px',
+        fontSize: isMobile ? '16px' : '11.5px',
         fontWeight: '600',
         letterSpacing: '1px',
         transition: 'all 0.3s',
-        border: isActive ? 'none' : '1px solid transparent',
-        background: isActive ? '#C8102E' : 'transparent',
+        border: 'none',
+        background: 'transparent',
         cursor: 'pointer',
         width: isMobile ? '100%' : 'auto',
         textAlign: isMobile ? 'left' : 'center',
         minHeight: isMobile ? '44px' : 'auto', // Touch-friendly height on mobile
         display: 'flex',
         alignItems: 'center',
-        justifyContent: isMobile ? 'flex-start' : 'center'
+        justifyContent: isMobile ? 'flex-start' : 'center',
+        position: 'relative',
       }}
       onMouseEnter={(e) => {
-        if (!isActive) {
-          e.target.style.color = '#F4A900';
-          e.target.style.borderColor = 'rgba(244,169,0,0.3)';
-          e.target.style.background = 'rgba(244,169,0,0.05)';
-        }
+        e.target.style.color = '#F4A900';
+        e.target.style.background = 'rgba(244,169,0,0.05)';
       }}
       onMouseLeave={(e) => {
-        if (!isActive) {
-          e.target.style.color = 'rgba(255,255,255,0.85)';
-          e.target.style.borderColor = 'transparent';
-          e.target.style.background = 'transparent';
-        }
+        e.target.style.color = 'rgba(255,255,255,0.85)';
+        e.target.style.background = 'transparent';
       }}
     >
-      {label}
+      <span style={{ position: 'relative', display: 'inline-block', width: '100%' }}>
+        {label}
+        {isActive && (
+          <span
+            style={{
+              display: 'block',
+              height: '3px',
+              borderRadius: '2px',
+              background: 'linear-gradient(90deg, #F4A900 60%, #C8102E 100%)',
+              marginTop: '2px',
+              width: '100%',
+              position: 'absolute',
+              left: 0,
+              bottom: isMobile ? '-6px' : '-7px',
+              zIndex: 2,
+            }}
+          />
+        )}
+      </span>
     </button>
   );
 }

@@ -6,6 +6,8 @@ import SimpleDataViewer from './SimpleDataViewer';
 import Header from './Header';
 import HomePage from './Home';
 import AddBoothAgent from './AddBoothAgent';
+import AddZonalAgent from './AddZonalAgent';
+import AddWardAgent from './AddWardAgent';
 import ConfirmationsAdmin from './ConfirmationsAdmin';
 
 const App = () => {
@@ -41,6 +43,10 @@ const App = () => {
           setCurrentPage('voters');
         } else if (path === '/add-booth-agent') {
           setCurrentPage('addBoothAgent');
+        } else if (path === '/add-zonal-agent') {
+          setCurrentPage('addZonalAgent');
+        } else if (path === '/add-ward-agent') {
+          setCurrentPage('addWardAgent');
         } else if (path === '/confirmations') {
           setCurrentPage('confirmations');
         } else {
@@ -58,6 +64,10 @@ const App = () => {
         setCurrentPage('dashboard');
       } else if (path === '/add-booth-agent') {
         setCurrentPage('addBoothAgent');
+      } else if (path === '/add-zonal-agent') {
+        setCurrentPage('addZonalAgent');
+      } else if (path === '/add-ward-agent') {
+        setCurrentPage('addWardAgent');
       } else if (path === '/confirmations') {
         setCurrentPage('confirmations');
       } else {
@@ -103,6 +113,10 @@ const App = () => {
       window.history.pushState({}, '', '/voters');
     } else if (page === 'addBoothAgent') {
       window.history.pushState({}, '', '/add-booth-agent');
+    } else if (page === 'addZonalAgent') {
+      window.history.pushState({}, '', '/add-zonal-agent');
+    } else if (page === 'addWardAgent') {
+      window.history.pushState({}, '', '/add-ward-agent');
     } else if (page === 'confirmations') {
       window.history.pushState({}, '', '/confirmations');
     }
@@ -157,6 +171,18 @@ const App = () => {
           />
         ) : currentPage === 'addBoothAgent' ? (
           <AddBoothAgent
+            languageMode={languageMode}
+            user={currentUser}
+            onNavigate={handleNavigation}
+          />
+        ) : currentPage === 'addZonalAgent' ? (
+          <AddZonalAgent
+            languageMode={languageMode}
+            user={currentUser}
+            onNavigate={handleNavigation}
+          />
+        ) : currentPage === 'addWardAgent' ? (
+          <AddWardAgent
             languageMode={languageMode}
             user={currentUser}
             onNavigate={handleNavigation}
